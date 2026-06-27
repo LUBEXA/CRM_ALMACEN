@@ -9,7 +9,8 @@ public enum EstadoSolicitud
     Aprobada = 1,
     Surtida = 2,
     Rechazada = 3,
-    Entregada = 4
+    Entregada = 4,
+    Cancelada = 5
 }
 
 /// <summary>

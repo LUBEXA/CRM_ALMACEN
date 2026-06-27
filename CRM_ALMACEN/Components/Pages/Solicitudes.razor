@@ -2,7 +2,9 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 
+@using Microsoft.JSInterop
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JS
 
 <PageTitle>Solicitudes de pedido - CRM Almacén</PageTitle>
 
@@ -149,6 +151,33 @@
                     <input class="form-control form-control-sm" placeholder="Ej. SOL-00012 o un nombre" @bind="filtroBusqueda" @bind:after="AplicarFiltrosAsync" />
                 </div>
             }
+            else
+            {
+                @* ---- Filtros del cliente para el Historial de pedidos ---- *@
+                <div class="col-6 col-md-3">
+                    <label class="form-label small mb-1">Buscar folio</label>
+                    <input class="form-control form-control-sm" placeholder="Ej. SOL-00012" @bind="filtroBusqueda" @bind:after="AplicarFiltrosAsync" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small mb-1">Estado</label>
+                    <select class="form-select form-select-sm" @bind="filtroEstado" @bind:after="AplicarFiltrosAsync">
+                        <option value="-2">Todos los estados</option>
+                        <option value="0">Pendiente</option>
+                        <option value="2">Surtida</option>
+                        <option value="4">Entregada</option>
+                        <option value="3">Rechazada</option>
+                        <option value="5">Cancelada</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small mb-1">Desde</label>
+                    <input type="date" class="form-control form-control-sm" @bind="filtroDesde" @bind:after="AplicarFiltrosAsync" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small mb-1">Hasta</label>
+                    <input type="date" class="form-control form-control-sm" @bind="filtroHasta" @bind:after="AplicarFiltrosAsync" />
+                </div>
+            }
             <div class="col-4 col-md-2 text-md-end">
                 <label class="form-label small mb-1 d-none d-md-block">&nbsp;</label>
                 <span class="badge text-bg-secondary">@totalRegistros pedido(s)</span>
@@ -164,6 +193,67 @@
 }
 else
 {
+    <h2 class="h5 mb-3">📋 Historial de pedidos</h2>
+
+    @if (!esAdmin)
+    {
+        <div class="mb-3">
+            <button class="btn btn-success btn-sm" @onclick="DescargarExcelAsync">
+                📊 Descargar en Excel
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Pedido</th>
+                        <th>Cant. x SKU</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in solicitudes)
+                    {
+                        <tr>
+                            <td class="small text-nowrap">@s.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td><span class="badge text-bg-dark font-monospace">@Folio(s)</span></td>
+                            <td>
+                                @foreach (var d in s.Detalles)
+                                {
+                                    <div class="small">@d.Cantidad x @d.Producto?.Nombre</div>
+                                }
+                            </td>
+                            <td><span class="badge @EstadoColor(s.Estado)">@EstadoTexto(s.Estado)</span></td>
+                            <td class="text-end text-nowrap">
+                                @if (s.Estado == EstadoSolicitud.Pendiente)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger mb-1" @onclick="() => CancelarAsync(s.Id)">Cancelar</button>
+                                }
+                                <button class="btn btn-sm btn-outline-primary mb-1" @onclick="() => ToggleComentarios(s.Id)">Ver comentarios</button>
+                            </td>
+                        </tr>
+                        @if (comentariosAbiertos.Contains(s.Id))
+                        {
+                            <tr class="table-active">
+                                <td colspan="5" class="small">
+                                    <strong>Comentarios / notas:</strong>
+                                    @(string.IsNullOrWhiteSpace(s.Notas) ? " Sin comentarios." : $" {s.Notas}")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    @if (solicitudes.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-4">No tienes pedidos con los filtros seleccionados.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
     @foreach (var s in solicitudes)
     {
         <div class="card mb-3">
@@ -192,8 +282,16 @@ else
 
                 @if (esAdmin && s.Estado == EstadoSolicitud.Pendiente)
                 {
-                    <button class="btn btn-sm btn-success me-2" @onclick="() => SurtirAsync(s.Id)">Aprobar y surtir</button>
+                    var sinCobros = CobrosDe(s.Id).Count == 0;
+                    <button class="btn btn-sm btn-success me-2" @onclick="() => SurtirAsync(s.Id)" disabled="@sinCobros">Aprobar y surtir</button>
                     <button class="btn btn-sm btn-outline-danger" @onclick="() => RechazarAsync(s.Id)">Rechazar</button>
+                    @if (sinCobros)
+                    {
+                        <span class="text-danger small ms-2">
+                            <span class="bi bi-exclamation-triangle"></span>
+                            Agrega los cobros antes de surtir.
+                        </span>
+                    }
                 }
 
                 @* ---- Cobros del pedido (solo administrador) ---- *@
@@ -306,6 +404,7 @@ else
     {
         <p class="text-muted">No hay pedidos con los filtros seleccionados.</p>
     }
+    }
     @if (errorAccion is not null)
     {
         <div class="alert alert-danger">@errorAccion</div>
@@ -336,13 +435,17 @@ else
     private int filtroEstado;          // -2 = todos; si no, valor del enum EstadoSolicitud
     private int filtroClienteId;       // 0 = todos los clientes (solo admin)
     private string filtroBusqueda = "";
+    private DateTime? filtroDesde;     // rango de fechas (Historial del cliente)
+    private DateTime? filtroHasta;
+    private readonly HashSet<int> comentariosAbiertos = [];   // pedidos con comentarios desplegados
     private int pagina = 1;
     private const int PorPagina = 8;
     private int totalRegistros;
     private int TotalPaginas => totalRegistros == 0 ? 1 : (int)Math.Ceiling(totalRegistros / (double)PorPagina);
 
     /// <summary>Folio único e irrepetible del pedido (basado en su Id).</summary>
-    private static string Folio(SolicitudPedido s) => $"SOL-{s.Id:00000}";
+    private static string Folio(SolicitudPedido s) => Folio(s.Id);
+    private static string Folio(int solicitudId) => $"SOL-{solicitudId:00000}";
 
     // Builder de la nueva solicitud (cliente)
     private string busquedaProducto = "";
@@ -403,6 +506,9 @@ else
         clienteId = user.ClienteId();
         usuario = user.Identity?.Name;
 
+        // El cliente ve su historial completo por defecto (todos los estados).
+        if (!esAdmin) filtroEstado = -2;
+
         if (esAdmin)
         {
             await using var db = await DbFactory.CreateDbContextAsync();
@@ -454,16 +560,27 @@ else
             query = query.Where(s => s.Estado == estado);
         }
 
-        // Búsqueda por folio (Id) o nombre de cliente (solo admin).
-        if (esAdmin && !string.IsNullOrWhiteSpace(filtroBusqueda))
+        // Búsqueda por folio (Id) para todos; por nombre de cliente solo admin.
+        if (!string.IsNullOrWhiteSpace(filtroBusqueda))
         {
             var texto = filtroBusqueda.Trim();
             var digitos = new string(texto.Where(char.IsDigit).ToArray());
             if (int.TryParse(digitos, out var folioId))
-                query = query.Where(s => s.Id == folioId || EF.Functions.ILike(s.Cliente!.Nombre, $"%{texto}%"));
-            else
+            {
+                if (esAdmin)
+                    query = query.Where(s => s.Id == folioId || EF.Functions.ILike(s.Cliente!.Nombre, $"%{texto}%"));
+                else
+                    query = query.Where(s => s.Id == folioId);
+            }
+            else if (esAdmin)
                 query = query.Where(s => EF.Functions.ILike(s.Cliente!.Nombre, $"%{texto}%"));
         }
+
+        // Rango de fechas (Historial del cliente; el admin no muestra estos campos).
+        if (filtroDesde is DateTime desde)
+            query = query.Where(s => s.Fecha >= desde.Date);
+        if (filtroHasta is DateTime hasta)
+            query = query.Where(s => s.Fecha < hasta.Date.AddDays(1));
 
         totalRegistros = await query.CountAsync();
 
@@ -640,6 +757,16 @@ else
     private async Task SurtirAsync(int solicitudId)
     {
         errorAccion = null;
+
+        // No se puede surtir si el pedido aún no tiene cobros capturados.
+        if (CobrosDe(solicitudId).Count == 0)
+        {
+            errorAccion = $"No puedes surtir el pedido {Folio(solicitudId)} sin agregar al menos un cobro. " +
+                          "Abre «Cobros de este pedido» y registra los conceptos antes de continuar.";
+            await JS.InvokeVoidAsync("alert", errorAccion);
+            return;
+        }
+
         await using var db = await DbFactory.CreateDbContextAsync();
         var solicitud = await db.Solicitudes.Include(s => s.Detalles).ThenInclude(d => d.Producto)
             .FirstOrDefaultAsync(s => s.Id == solicitudId);
@@ -693,9 +820,104 @@ else
         EstadoSolicitud.Pendiente => "text-bg-warning",
         EstadoSolicitud.Aprobada => "text-bg-info",
         EstadoSolicitud.Surtida => "text-bg-success",
+        EstadoSolicitud.Entregada => "text-bg-success",
         EstadoSolicitud.Rechazada => "text-bg-danger",
+        EstadoSolicitud.Cancelada => "text-bg-secondary",
         _ => "text-bg-secondary"
     };
+
+    private static string EstadoTexto(EstadoSolicitud e) => e switch
+    {
+        EstadoSolicitud.Pendiente => "Pendiente",
+        EstadoSolicitud.Aprobada => "Aprobada",
+        EstadoSolicitud.Surtida => "Surtida",
+        EstadoSolicitud.Entregada => "Entregada",
+        EstadoSolicitud.Rechazada => "Rechazada",
+        EstadoSolicitud.Cancelada => "Cancelada",
+        _ => e.ToString()
+    };
+
+    private void ToggleComentarios(int solicitudId)
+    {
+        if (!comentariosAbiertos.Remove(solicitudId))
+            comentariosAbiertos.Add(solicitudId);
+    }
+
+    /// <summary>El cliente cancela un pedido propio que aún está Pendiente.</summary>
+    private async Task CancelarAsync(int solicitudId)
+    {
+        errorAccion = null;
+        var confirmar = await JS.InvokeAsync<bool>("confirm", "¿Seguro que deseas cancelar este pedido?");
+        if (!confirmar) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var solicitud = await db.Solicitudes.FindAsync(solicitudId);
+        if (solicitud is null) return;
+
+        // Seguridad: solo el dueño puede cancelar y solo si sigue Pendiente.
+        if (clienteId is int cid && solicitud.ClienteId != cid) return;
+        if (solicitud.Estado != EstadoSolicitud.Pendiente)
+        {
+            errorAccion = "Este pedido ya no se puede cancelar.";
+            return;
+        }
+
+        solicitud.Estado = EstadoSolicitud.Cancelada;
+        solicitud.FechaAtencion = DateTime.Now;
+        solicitud.AtendidoPor = usuario;
+        await db.SaveChangesAsync();
+        await CargarAsync();
+    }
+
+    /// <summary>Descarga el historial filtrado del cliente como archivo CSV (abre en Excel).</summary>
+    private async Task DescargarExcelAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var query = db.Solicitudes
+            .Include(s => s.Detalles).ThenInclude(d => d.Producto)
+            .AsQueryable();
+
+        if (clienteId is int id) query = query.Where(s => s.ClienteId == id);
+        if (filtroEstado != -2)
+        {
+            var estado = (EstadoSolicitud)filtroEstado;
+            query = query.Where(s => s.Estado == estado);
+        }
+        if (!string.IsNullOrWhiteSpace(filtroBusqueda))
+        {
+            var digitos = new string(filtroBusqueda.Where(char.IsDigit).ToArray());
+            if (int.TryParse(digitos, out var folioId))
+                query = query.Where(s => s.Id == folioId);
+        }
+        if (filtroDesde is DateTime desde) query = query.Where(s => s.Fecha >= desde.Date);
+        if (filtroHasta is DateTime hasta) query = query.Where(s => s.Fecha < hasta.Date.AddDays(1));
+
+        var datos = await query.OrderByDescending(s => s.Fecha).ToListAsync();
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Fecha;Pedido;Cantidad x SKU;Estado");
+        foreach (var s in datos)
+        {
+            var skus = string.Join(" | ", s.Detalles.Select(d => $"{d.Cantidad}x {d.Producto?.Nombre}"));
+            sb.AppendLine($"{s.Fecha:dd/MM/yyyy HH:mm};{Folio(s)};{Csv(skus)};{EstadoTexto(s.Estado)}");
+        }
+
+        // BOM UTF-8 para que Excel respete los acentos.
+        var bytes = System.Text.Encoding.UTF8.GetPreamble()
+            .Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("descargarArchivo",
+            $"historial-pedidos-{DateTime.Now:yyyyMMdd}.csv", b64, "text/csv");
+    }
+
+    /// <summary>Escapa un valor para CSV (separador ; con comillas si hace falta).</summary>
+    private static string Csv(string? valor)
+    {
+        valor ??= "";
+        if (valor.Contains(';') || valor.Contains('"') || valor.Contains('\n'))
+            return $"\"{valor.Replace("\"", "\"\"")}\"";
+        return valor;
+    }
 
     private sealed class Renglon
     {

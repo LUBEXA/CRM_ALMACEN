@@ -32,7 +32,15 @@
       "Bash(PGPASSWORD=postgres '/c/Program Files/PostgreSQL/18/bin/psql.exe' -U postgres -h localhost -d CRM_ALMACEN -c 'DELETE FROM \"Solicitudes\" WHERE \"Estado\" = 3;')",
       "Bash(git commit -m ' *)",
       "PowerShell(dotnet build CRM_ALMACEN/CRM_ALMACEN.csproj -nologo -v q 2>&1)",
-      "PowerShell(dotnet ef migrations add CatalogoServicios --project CRM_ALMACEN/CRM_ALMACEN.csproj --startup-project CRM_ALMACEN/CRM_ALMACEN.csproj 2>&1)"
+      "PowerShell(dotnet ef migrations add CatalogoServicios --project CRM_ALMACEN/CRM_ALMACEN.csproj --startup-project CRM_ALMACEN/CRM_ALMACEN.csproj 2>&1)",
+      "PowerShell(dotnet build CRM_ALMACEN/CRM_ALMACEN.csproj -nologo -clp:ErrorsOnly)",
+      "PowerShell(dotnet build CRM_ALMACEN/CRM_ALMACEN.csproj -nologo -clp:ErrorsOnly -t:Compile)",
+      "PowerShell(git -C C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN status --short)",
+      "PowerShell(git -C C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN branch --show-current)",
+      "PowerShell(git -C C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN add CRM_ALMACEN/Components/Pages/Entradas.razor CRM_ALMACEN/Components/Pages/Productos.razor CRM_ALMACEN/Components/Pages/Solicitudes.razor)",
+      "PowerShell(git -C C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN push origin main)",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | Select-Object LocalPort, OwningProcess; Get-Process -Id $c.OwningProcess | Select-Object Id, ProcessName } else { \"Puerto 5194 libre\" })",
+      "PowerShell(git add -A)"
     ]
   }
 }

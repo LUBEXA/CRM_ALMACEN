@@ -1,4 +1,6 @@
+@using Microsoft.JSInterop
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JS
 
 @* Tablero de pedidos: arrastra las tarjetas entre columnas. *@
 
@@ -28,24 +30,130 @@
                 <span class="badge @ColorEstado(seleccionada.Estado)">@EtiquetaEstado(seleccionada.Estado)</span>
             </p>
 
-            <table class="table table-sm">
-                <thead><tr><th>Producto</th><th class="text-end">Cantidad</th><th class="text-end">Existencia</th></tr></thead>
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Producto</th><th class="text-center" style="width:110px">Cantidad</th><th class="text-end" style="width:90px">Existencia</th><th style="width:40px"></th></tr></thead>
                 <tbody>
                     @foreach (var d in seleccionada.Detalles)
                     {
                         <tr>
                             <td>@d.Producto?.Codigo — @d.Producto?.Nombre</td>
-                            <td class="text-end fw-bold">@d.Cantidad</td>
+                            <td class="text-center">
+                                <input type="number" min="1" class="form-control form-control-sm text-center" @bind="d.Cantidad" disabled="@procesandoPedido" />
+                            </td>
                             <td class="text-end @(d.Producto is not null && d.Cantidad > d.Producto.CantidadDisponible ? "text-danger fw-bold" : "")">
                                 @d.Producto?.CantidadDisponible
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => QuitarProductoAsync(d)" disabled="@procesandoPedido" title="Quitar este producto"><span class="bi bi-trash"></span></button>
                             </td>
                         </tr>
                     }
                 </tbody>
             </table>
+            <div class="d-flex gap-2 flex-wrap mb-2">
+                <button class="btn btn-sm btn-outline-primary" @onclick="GuardarPedidoAsync" disabled="@procesandoPedido">
+                    <span class="bi bi-save"></span> Guardar cambios del pedido
+                </button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarPedidoAsync(seleccionada)" disabled="@procesandoPedido">
+                    <span class="bi bi-trash"></span> Eliminar pedido completo
+                </button>
+            </div>
             @if (!string.IsNullOrWhiteSpace(seleccionada.Notas))
             {
                 <p class="small"><strong>Notas:</strong> @seleccionada.Notas</p>
+            }
+
+            @* ---------- Cobros del pedido (solo administrador) ---------- *@
+            @if (!SoloLectura)
+            {
+                <div class="border-top pt-3 mt-3">
+                    <h6 class="mb-2"><span class="bi bi-cash-coin"></span> Cobros del pedido
+                        <span class="text-muted small fw-normal">— el cliente no los ve aquí</span>
+                    </h6>
+
+                    <table class="table table-sm align-middle mb-2">
+                        <thead>
+                            <tr>
+                                <th>Concepto</th>
+                                <th class="text-center" style="width:80px">Cant.</th>
+                                <th class="text-end" style="width:130px">P. unitario</th>
+                                <th class="text-end" style="width:120px">Importe</th>
+                                <th style="width:40px"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in cobros)
+                            {
+                                <tr>
+                                    <td><input class="form-control form-control-sm" @bind="c.Concepto" /></td>
+                                    <td><input type="number" min="1" class="form-control form-control-sm text-center" @bind="c.Cantidad" @bind:after="() => RecalcularCargo(c)" /></td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" step="0.01" class="form-control text-end" @bind="c.PrecioUnitario" @bind:after="() => RecalcularCargo(c)" />
+                                        </div>
+                                    </td>
+                                    <td class="text-end fw-semibold">@Money(c.Monto)</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarCobroAsync(c.Id)" disabled="@procesandoCobro" title="Quitar cobro"><span class="bi bi-trash"></span></button>
+                                    </td>
+                                </tr>
+                            }
+                            @if (cobros.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-danger py-2">Aún no hay cobros. Agrega al menos uno para poder entregar.</td></tr>
+                            }
+                        </tbody>
+                        @if (cobros.Count > 0)
+                        {
+                            <tfoot>
+                                <tr>
+                                    <td class="fw-bold" colspan="3">Total a cobrar</td>
+                                    <td class="text-end fw-bold">@Money(cobros.Sum(c => c.Monto))</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        }
+                    </table>
+
+                    @* Fila para agregar un cobro: desde el tarifario o uno manual *@
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12">
+                            <label class="form-label small mb-1">Servicio contratado</label>
+                            <select class="form-select form-select-sm" value="0" @onchange="SeleccionarTarifario">
+                                <option value="0">-- Concepto adicional (manual) --</option>
+                                @foreach (var t in tarifario)
+                                {
+                                    <option value="@t.Id">@t.Concepto — @Money(t.ImporteNeto)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label small mb-1">Concepto</label>
+                            <input class="form-control form-control-sm" @bind="nuevoCobro.Concepto" placeholder="Ej. Maniobra extra" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label small mb-1">Cantidad</label>
+                            <input type="number" min="1" class="form-control form-control-sm" @bind="nuevoCobro.Cantidad" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label small mb-1">P. unitario</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm" @bind="nuevoCobro.PrecioUnitario" />
+                        </div>
+                        <div class="col-1">
+                            <button class="btn btn-sm btn-success w-100" @onclick="AgregarCobroAsync" disabled="@procesandoCobro" title="Agregar cobro">+</button>
+                        </div>
+                    </div>
+
+                    @if (cobros.Count > 0)
+                    {
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="GuardarCobrosAsync" disabled="@procesandoCobro">
+                                <span class="bi bi-save"></span> Guardar cambios
+                            </button>
+                        </div>
+                    }
+                </div>
             }
 
             <div class="d-flex gap-2 flex-wrap mt-3">
@@ -56,7 +164,14 @@
                 }
                 else if (seleccionada.Estado == EstadoSolicitud.Surtida)
                 {
-                    <button class="btn btn-primary btn-sm" @onclick="() => MoverAsync(seleccionada, EstadoSolicitud.Entregada)">✅ Marcar entregado</button>
+                    var sinCobros = cobros.Count == 0;
+                    <button class="btn btn-primary btn-sm" @onclick="() => MoverAsync(seleccionada, EstadoSolicitud.Entregada)" disabled="@sinCobros">✅ Marcar entregado</button>
+                    @if (sinCobros)
+                    {
+                        <span class="text-danger small align-self-center">
+                            <span class="bi bi-exclamation-triangle"></span> Agrega los cobros para poder entregar.
+                        </span>
+                    }
                 }
                 else if (seleccionada.Estado == EstadoSolicitud.Entregada)
                 {
@@ -87,6 +202,24 @@
     private string? mensaje;
     private bool esError;
 
+    // Cobros (Cargos) del pedido. Solo los ve el administrador; el cliente nunca.
+    private readonly Dictionary<int, int> cobrosCount = [];   // Id pedido -> nº de cobros
+    private List<Cargo> cobros = [];                           // cobros del pedido abierto
+    private List<CostoServicio> tarifario = [];               // tarifario del cliente abierto
+    private Cargo nuevoCobro = new() { Cantidad = 1 };
+    private bool procesandoCobro;
+
+    // Edición del pedido abierto (cantidades originales para ajustar el stock).
+    private readonly Dictionary<int, int> cantidadOriginal = [];   // DetalleId -> cantidad original
+    private bool procesandoPedido;
+
+    /// <summary>True si el pedido ya descontó stock (fue despachado o entregado).</summary>
+    private static bool StockDescontado(EstadoSolicitud e) =>
+        e is EstadoSolicitud.Surtida or EstadoSolicitud.Entregada;
+
+    private bool TieneCobros(SolicitudPedido s) =>
+        cobrosCount.TryGetValue(s.Id, out var n) && n > 0;
+
     protected override async Task OnInitializedAsync()
     {
         usuario = (await AuthStateTask).User.Identity?.Name;
@@ -111,6 +244,16 @@
         solicitado = lista.Where(s => s.Estado == EstadoSolicitud.Pendiente).ToList();
         despachado = lista.Where(s => s.Estado == EstadoSolicitud.Surtida).ToList();
         entregado = lista.Where(s => s.Estado == EstadoSolicitud.Entregada).ToList();
+
+        // Conteo de cobros por pedido (para validar y mostrar el aviso en las tarjetas).
+        var ids = lista.Select(s => s.Id).ToList();
+        cobrosCount.Clear();
+        var conteos = await db.Cargos
+            .Where(c => c.SolicitudPedidoId != null && ids.Contains(c.SolicitudPedidoId!.Value))
+            .GroupBy(c => c.SolicitudPedidoId!.Value)
+            .Select(g => new { Id = g.Key, N = g.Count() })
+            .ToListAsync();
+        foreach (var x in conteos) cobrosCount[x.Id] = x.N;
     }
 
     private async Task SoltarEnAsync(EstadoSolicitud destino)
@@ -137,6 +280,13 @@
         {
             esError = true;
             mensaje = $"El pedido #{s.Id} debe despacharse antes de marcarse como entregado.";
+            return;
+        }
+        // No se entrega un pedido sin cobros capturados.
+        if (destino == EstadoSolicitud.Entregada && !TieneCobros(s))
+        {
+            esError = true;
+            mensaje = $"El pedido #{s.Id} no puede marcarse como entregado: primero agrega los cobros desde el detalle del pedido.";
             return;
         }
         if (destino == EstadoSolicitud.Pendiente && s.Estado != EstadoSolicitud.Pendiente)
@@ -198,8 +348,283 @@
         await CargarAsync();
     }
 
-    private void Abrir(SolicitudPedido s) => seleccionada = s;
-    private void Cerrar() => seleccionada = null;
+    /// <summary>Elimina por completo un pedido. Si ya estaba despachado, devuelve el stock.</summary>
+    private async Task EliminarPedidoAsync(SolicitudPedido s)
+    {
+        var confirmar = await JS.InvokeAsync<bool>("confirm",
+            $"¿Eliminar el pedido #{s.Id} completo?" +
+            (StockDescontado(s.Estado) ? " El producto despachado regresará al stock." : "") +
+            " Esta acción no se puede deshacer.");
+        if (!confirmar) return;
+
+        procesandoPedido = true;
+        mensaje = null;
+        esError = false;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            // Devolver al stock lo que se sacó por este pedido y borrar esas salidas.
+            var salidas = await db.Salidas.Where(x => x.SolicitudPedidoId == s.Id).ToListAsync();
+            foreach (var sal in salidas)
+            {
+                var prod = await db.Productos.FindAsync(sal.ProductoId);
+                if (prod is not null) prod.CantidadDisponible += sal.Cantidad;
+            }
+            db.Salidas.RemoveRange(salidas);
+
+            // Borrar los cobros asociados (no deben quedar en el estado de cuenta).
+            var cargosPedido = await db.Cargos.Where(c => c.SolicitudPedidoId == s.Id).ToListAsync();
+            db.Cargos.RemoveRange(cargosPedido);
+
+            // Borrar el pedido (los detalles se borran en cascada).
+            var detalles = await db.DetallesSolicitud.Where(d => d.SolicitudPedidoId == s.Id).ToListAsync();
+            db.DetallesSolicitud.RemoveRange(detalles);
+            var solicitud = await db.Solicitudes.FindAsync(s.Id);
+            if (solicitud is not null) db.Solicitudes.Remove(solicitud);
+
+            await db.SaveChangesAsync();
+            mensaje = $"Pedido #{s.Id} eliminado" + (salidas.Count > 0 ? " y stock devuelto." : ".");
+            Cerrar();
+            await CargarAsync();
+        }
+        finally { procesandoPedido = false; }
+    }
+
+    /// <summary>Quita un producto del pedido. Si ya estaba despachado, devuelve su stock.</summary>
+    private async Task QuitarProductoAsync(DetalleSolicitud d)
+    {
+        if (seleccionada is null) return;
+
+        if (seleccionada.Detalles.Count <= 1)
+        {
+            esError = true;
+            mensaje = "El pedido quedaría sin productos. Usa «Eliminar pedido completo».";
+            return;
+        }
+
+        var confirmar = await JS.InvokeAsync<bool>("confirm",
+            $"¿Quitar «{d.Producto?.Nombre}» del pedido?" +
+            (StockDescontado(seleccionada.Estado) ? " Se devolverá su stock." : ""));
+        if (!confirmar) return;
+
+        procesandoPedido = true;
+        mensaje = null;
+        esError = false;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (StockDescontado(seleccionada.Estado))
+            {
+                var salidas = await db.Salidas
+                    .Where(x => x.SolicitudPedidoId == seleccionada.Id && x.ProductoId == d.ProductoId).ToListAsync();
+                var prod = await db.Productos.FindAsync(d.ProductoId);
+                if (prod is not null)
+                    prod.CantidadDisponible += salidas.Sum(x => x.Cantidad);
+                db.Salidas.RemoveRange(salidas);
+            }
+
+            var detalle = await db.DetallesSolicitud.FindAsync(d.Id);
+            if (detalle is not null) db.DetallesSolicitud.Remove(detalle);
+
+            await db.SaveChangesAsync();
+            mensaje = $"Producto quitado del pedido #{seleccionada.Id}.";
+            await RecargarSeleccionadaAsync();
+        }
+        finally { procesandoPedido = false; }
+    }
+
+    /// <summary>Guarda los cambios de cantidad. Ajusta el stock si el pedido ya fue despachado.</summary>
+    private async Task GuardarPedidoAsync()
+    {
+        if (seleccionada is null) return;
+        procesandoPedido = true;
+        mensaje = null;
+        esError = false;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var despachado = StockDescontado(seleccionada.Estado);
+
+            foreach (var d in seleccionada.Detalles)
+            {
+                if (d.Cantidad < 1) d.Cantidad = 1;
+                var original = cantidadOriginal.TryGetValue(d.Id, out var o) ? o : d.Cantidad;
+                var delta = d.Cantidad - original;          // positivo = se pide más
+
+                var detalle = await db.DetallesSolicitud.FindAsync(d.Id);
+                if (detalle is null) continue;
+
+                if (despachado && delta != 0)
+                {
+                    var prod = await db.Productos.FindAsync(d.ProductoId);
+                    if (prod is null) continue;
+
+                    // Más cantidad descuenta stock; menos cantidad lo devuelve.
+                    if (delta > 0 && delta > prod.CantidadDisponible)
+                    {
+                        esError = true;
+                        mensaje = $"No hay existencia suficiente de {prod.Nombre} para subir la cantidad.";
+                        return;
+                    }
+                    prod.CantidadDisponible -= delta;
+
+                    // Reflejar el cambio en la salida del pedido.
+                    var salida = await db.Salidas
+                        .FirstOrDefaultAsync(x => x.SolicitudPedidoId == seleccionada.Id && x.ProductoId == d.ProductoId);
+                    if (salida is not null) salida.Cantidad = d.Cantidad;
+                }
+
+                detalle.Cantidad = d.Cantidad;
+            }
+
+            await db.SaveChangesAsync();
+            mensaje = $"Pedido #{seleccionada.Id} actualizado.";
+            await RecargarSeleccionadaAsync();
+        }
+        finally { procesandoPedido = false; }
+    }
+
+    /// <summary>Recarga el pedido abierto y el tablero tras editarlo.</summary>
+    private async Task RecargarSeleccionadaAsync()
+    {
+        var id = seleccionada?.Id;
+        await CargarAsync();
+        if (id is int sid)
+        {
+            seleccionada = solicitado.Concat(despachado).Concat(entregado).FirstOrDefault(s => s.Id == sid);
+            if (seleccionada is not null)
+            {
+                cantidadOriginal.Clear();
+                foreach (var d in seleccionada.Detalles) cantidadOriginal[d.Id] = d.Cantidad;
+            }
+        }
+    }
+
+    private async Task Abrir(SolicitudPedido s)
+    {
+        seleccionada = s;
+        nuevoCobro = new Cargo { Cantidad = 1 };
+        cantidadOriginal.Clear();
+        foreach (var d in s.Detalles) cantidadOriginal[d.Id] = d.Cantidad;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        cobros = await db.Cargos
+            .Where(c => c.SolicitudPedidoId == s.Id)
+            .OrderBy(c => c.Id).ToListAsync();
+        tarifario = await db.CostosServicio
+            .Where(c => c.ClienteId == s.ClienteId)
+            .OrderBy(c => c.Concepto).ToListAsync();
+    }
+
+    private void Cerrar()
+    {
+        seleccionada = null;
+        cobros = [];
+        tarifario = [];
+    }
+
+    private void SeleccionarTarifario(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var tid) && tid > 0)
+        {
+            var t = tarifario.FirstOrDefault(x => x.Id == tid);
+            if (t is not null)
+            {
+                nuevoCobro.Concepto = t.Concepto;
+                nuevoCobro.PrecioUnitario = t.ImporteNeto;
+                if (nuevoCobro.Cantidad < 1) nuevoCobro.Cantidad = 1;
+            }
+        }
+    }
+
+    private async Task AgregarCobroAsync()
+    {
+        if (seleccionada is null || string.IsNullOrWhiteSpace(nuevoCobro.Concepto)) return;
+        procesandoCobro = true;
+        try
+        {
+            var s = seleccionada;
+            nuevoCobro.Cantidad = nuevoCobro.Cantidad < 1 ? 1 : nuevoCobro.Cantidad;
+            RecalcularCargo(nuevoCobro);
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Cargos.Add(new Cargo
+            {
+                ClienteId = s.ClienteId,
+                SolicitudPedidoId = s.Id,
+                Anio = s.Fecha.Year,
+                Mes = s.Fecha.Month,
+                Concepto = nuevoCobro.Concepto.Trim(),
+                Tipo = TipoCargo.Servicio,
+                Cantidad = nuevoCobro.Cantidad,
+                PrecioUnitario = nuevoCobro.PrecioUnitario,
+                Monto = nuevoCobro.Monto
+            });
+            await db.SaveChangesAsync();
+
+            nuevoCobro = new Cargo { Cantidad = 1 };
+            await RecargarCobrosAsync(s.Id);
+        }
+        finally { procesandoCobro = false; }
+    }
+
+    private async Task GuardarCobrosAsync()
+    {
+        if (seleccionada is null) return;
+        procesandoCobro = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            foreach (var c in cobros)
+            {
+                c.Concepto = c.Concepto.Trim();
+                RecalcularCargo(c);
+                db.Cargos.Update(c);
+            }
+            await db.SaveChangesAsync();
+            mensaje = "Cobros guardados.";
+            esError = false;
+        }
+        finally { procesandoCobro = false; }
+    }
+
+    private async Task EliminarCobroAsync(int cargoId)
+    {
+        if (seleccionada is null) return;
+        procesandoCobro = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var cargo = await db.Cargos.FindAsync(cargoId);
+            if (cargo is not null)
+            {
+                db.Cargos.Remove(cargo);
+                await db.SaveChangesAsync();
+            }
+            await RecargarCobrosAsync(seleccionada.Id);
+        }
+        finally { procesandoCobro = false; }
+    }
+
+    /// <summary>Recarga los cobros del pedido abierto y actualiza el conteo de la tarjeta.</summary>
+    private async Task RecargarCobrosAsync(int solicitudId)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        cobros = await db.Cargos
+            .Where(c => c.SolicitudPedidoId == solicitudId)
+            .OrderBy(c => c.Id).ToListAsync();
+        cobrosCount[solicitudId] = cobros.Count;
+    }
+
+    /// <summary>Recalcula el importe del cobro: Cantidad × Precio unitario.</summary>
+    private static void RecalcularCargo(Cargo c)
+    {
+        if (c.Cantidad < 1) c.Cantidad = 1;
+        c.Monto = c.Cantidad * c.PrecioUnitario;
+    }
+
+    private static string Money(decimal m) => $"${m:N2} MXN";
 
     private RenderFragment RenderColumna(string titulo, EstadoSolicitud estado, List<SolicitudPedido> items, string css) => __builder =>
     {
@@ -216,6 +641,12 @@
                         <span><span class="bi bi-box"></span> @s.Detalles.Count art.</span>
                         <span>@s.Fecha.ToString("dd/MM/yy")</span>
                     </div>
+                    @if (s.Estado == EstadoSolicitud.Surtida && !SoloLectura && !TieneCobros(s))
+                    {
+                        <div class="text-danger small mt-1">
+                            <span class="bi bi-exclamation-triangle"></span> Faltan cobros
+                        </div>
+                    }
                 </div>
             }
             @if (items.Count == 0)
