@@ -177,39 +177,88 @@ else
                             <th>Referencia</th>
                             <th class="text-center">XML</th>
                             <th class="text-center">PDF</th>
+                            @if (esAdmin) { <th></th> }
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var p in pagosPeriodo)
                         {
                             <tr>
-                                <td>@p.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
-                                <td class="text-end fw-semibold">@Money(p.Monto)</td>
-                                <td>@p.MetodoTexto</td>
-                                <td>@(string.IsNullOrEmpty(p.Referencia) ? "—" : p.Referencia)</td>
-                                <td class="text-center">
-                                    @if (!string.IsNullOrEmpty(p.XmlArchivo))
-                                    {
-                                        <a href="@p.XmlArchivo" target="_blank" title="Descargar XML"><span class="bi bi-filetype-xml fs-5"></span></a>
-                                    }
-                                    else { <span class="text-muted">—</span> }
-                                </td>
-                                <td class="text-center">
-                                    @if (!string.IsNullOrEmpty(p.PdfArchivo))
-                                    {
-                                        <a href="@p.PdfArchivo" target="_blank" title="Descargar PDF"><span class="bi bi-filetype-pdf fs-5 text-danger"></span></a>
-                                    }
-                                    else { <span class="text-muted">—</span> }
-                                </td>
+                                @if (esAdmin)
+                                {
+                                    <td style="min-width:185px"><input type="datetime-local" class="form-control form-control-sm" @bind="p.Fecha" /></td>
+                                    <td style="max-width:150px">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" step="0.01" min="0" class="form-control text-end" @bind="p.Monto" />
+                                        </div>
+                                    </td>
+                                    <td style="min-width:150px">
+                                        <select class="form-select form-select-sm" @bind="p.MetodoPago">
+                                            @foreach (var m in Enum.GetValues<MetodoPago>())
+                                            {
+                                                <option value="@m">@MetodoTexto(m)</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td><input class="form-control form-control-sm" @bind="p.Referencia" /></td>
+                                    <td class="text-center" style="min-width:130px">
+                                        @if (!string.IsNullOrEmpty(p.XmlArchivo))
+                                        {
+                                            <a href="@p.XmlArchivo" target="_blank" title="Ver XML"><span class="bi bi-filetype-xml fs-5"></span></a>
+                                        }
+                                        <InputFile OnChange="(e) => SubirXmlPago(e, p)" class="form-control form-control-sm mt-1" accept=".xml" />
+                                    </td>
+                                    <td class="text-center" style="min-width:130px">
+                                        @if (!string.IsNullOrEmpty(p.PdfArchivo))
+                                        {
+                                            <a href="@p.PdfArchivo" target="_blank" title="Ver PDF"><span class="bi bi-filetype-pdf fs-5 text-danger"></span></a>
+                                        }
+                                        <InputFile OnChange="(e) => SubirPdfPago(e, p)" class="form-control form-control-sm mt-1" accept=".pdf" />
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarPagoAsync(p.Id)" title="Eliminar pago"><span class="bi bi-trash"></span></button>
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td>@p.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td class="text-end fw-semibold">@Money(p.Monto)</td>
+                                    <td>@p.MetodoTexto</td>
+                                    <td>@(string.IsNullOrEmpty(p.Referencia) ? "—" : p.Referencia)</td>
+                                    <td class="text-center">
+                                        @if (!string.IsNullOrEmpty(p.XmlArchivo))
+                                        {
+                                            <a href="@p.XmlArchivo" target="_blank" title="Descargar XML"><span class="bi bi-filetype-xml fs-5"></span></a>
+                                        }
+                                        else { <span class="text-muted">—</span> }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (!string.IsNullOrEmpty(p.PdfArchivo))
+                                        {
+                                            <a href="@p.PdfArchivo" target="_blank" title="Descargar PDF"><span class="bi bi-filetype-pdf fs-5 text-danger"></span></a>
+                                        }
+                                        else { <span class="text-muted">—</span> }
+                                    </td>
+                                }
                             </tr>
                         }
                         @if (pagosPeriodo.Count == 0)
                         {
-                            <tr><td colspan="6" class="text-center text-muted py-3">Sin pagos en este periodo.</td></tr>
+                            <tr><td colspan="@(esAdmin ? 7 : 6)" class="text-center text-muted py-3">Sin pagos en este periodo.</td></tr>
                         }
                     </tbody>
                 </table>
             </div>
+
+            @if (esAdmin && pagosPeriodo.Count > 0)
+            {
+                <button class="btn btn-sm btn-primary" @onclick="GuardarCambiosPagosAsync" disabled="@procesando">
+                    <span class="bi bi-save"></span> Guardar cambios de pagos
+                </button>
+                @if (subiendo) { <span class="text-muted ms-2 small">Subiendo archivo...</span> }
+                @if (mensajePago is not null) { <span class="text-success ms-2 small">@mensajePago</span> }
+            }
 
             @if (esAdmin)
             {
@@ -269,6 +318,7 @@ else
                             <th>Método de pago</th>
                             <th class="text-center">XML</th>
                             <th class="text-center">PDF</th>
+                            @if (esAdmin) { <th></th> }
                         </tr>
                     </thead>
                     <tbody>
@@ -293,11 +343,17 @@ else
                                     }
                                     else { <span class="text-muted">—</span> }
                                 </td>
+                                @if (esAdmin)
+                                {
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarPagoAsync(p.Id)" title="Eliminar pago"><span class="bi bi-trash"></span></button>
+                                    </td>
+                                }
                             </tr>
                         }
                         @if (pagosTodos.Count == 0)
                         {
-                            <tr><td colspan="6" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>
+                            <tr><td colspan="@(esAdmin ? 7 : 6)" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>
                         }
                     </tbody>
                 </table>
@@ -572,6 +628,69 @@ else
             await CargarPeriodoAsync();
         }
         finally { procesando = false; }
+    }
+
+    private async Task GuardarCambiosPagosAsync()
+    {
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            foreach (var p in pagosPeriodo)
+                db.Pagos.Update(p);
+            await db.SaveChangesAsync();
+            mensajePago = "Cambios guardados.";
+            if (clienteId is int id) await CargarPeriodosAsync(id);
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task EliminarPagoAsync(int pagoId)
+    {
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var pago = await db.Pagos.FindAsync(pagoId);
+            if (pago is not null)
+            {
+                db.Pagos.Remove(pago);
+                await db.SaveChangesAsync();
+            }
+            if (clienteId is int id) await CargarPeriodosAsync(id);
+            await CargarPeriodoAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task SubirXmlPago(InputFileChangeEventArgs e, Pago p)
+    {
+        subiendo = true;
+        try
+        {
+            var ruta = await Almacenamiento.GuardarAsync(e.File, $"clientes/{p.ClienteId}/facturas", "factura", p.XmlArchivo);
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var pago = await db.Pagos.FindAsync(p.Id);
+            if (pago is not null) { pago.XmlArchivo = ruta; await db.SaveChangesAsync(); }
+            p.XmlArchivo = ruta;
+            mensajePago = "Factura XML adjuntada.";
+        }
+        finally { subiendo = false; }
+    }
+
+    private async Task SubirPdfPago(InputFileChangeEventArgs e, Pago p)
+    {
+        subiendo = true;
+        try
+        {
+            var ruta = await Almacenamiento.GuardarAsync(e.File, $"clientes/{p.ClienteId}/facturas", "factura", p.PdfArchivo);
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var pago = await db.Pagos.FindAsync(p.Id);
+            if (pago is not null) { pago.PdfArchivo = ruta; await db.SaveChangesAsync(); }
+            p.PdfArchivo = ruta;
+            mensajePago = "Factura PDF adjuntada.";
+        }
+        finally { subiendo = false; }
     }
 
     private void ResetForms()
