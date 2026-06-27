@@ -5,6 +5,10 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
+// PostgreSQL guarda fechas como hora local (sin zona horaria), igual que el sistema
+// las maneja. Evita el requisito de UTC de Npgsql para un negocio de una sola zona.
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Blazor (componentes interactivos del lado servidor) ---
@@ -29,7 +33,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Falta la cadena de conexión 'DefaultConnection'.");
 // Fábrica de contextos: cada pantalla Blazor crea su propio contexto de corta vida.
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseNpgsql(connectionString));
 // Contexto con ámbito (scoped) que Identity necesita, creado desde la fábrica.
 builder.Services.AddScoped<ApplicationDbContext>(sp =>
     sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
