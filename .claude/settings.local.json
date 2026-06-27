@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet add *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet ef *)",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development dotnet run --no-build)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} -> redirect: %{redirect_url}\\\\n\" http://localhost:5194/Account/Login)",
+      "Bash(curl -s -L http://localhost:5194/Account/Login)",
+      "Bash(echo \"=== END\\($?\\) ===\")",
+      "Bash(netstat -ano)",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=\"http://localhost:5194\" dotnet run --no-build)",
+      "Bash(curl -s -o /dev/null -w \"Pagina de login -> HTTP %{http_code}\\\\n\" http://localhost:5194/Account/Login)",
+      "Bash(curl -s http://localhost:5194/Account/Login)",
+      "Bash(powershell -Command 'Get-CimInstance Win32_Process -Filter \"Name='\\\\''dotnet.exe'\\\\''\" | Where-Object { $_.CommandLine -like '\\\\''*CRM_ALMACEN*'\\\\'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Output \\('\\\\''Detenido PID '\\\\'' + $_.ProcessId\\) }')",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=\"http://localhost:5195\" dotnet run --no-build)",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development dotnet run --no-build --launch-profile http)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"Detenido.\")"
+    ]
+  }
+}

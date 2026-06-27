@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "CRM_ALMACEN (HTTPS)",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "CRM_ALMACEN/CRM_ALMACEN", "--launch-profile", "https"],
+      "port": 7296
+    },
+    {
+      "name": "CRM_ALMACEN (HTTP)",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "CRM_ALMACEN/CRM_ALMACEN", "--launch-profile", "http"],
+      "port": 5194
+    }
+  ]
+}

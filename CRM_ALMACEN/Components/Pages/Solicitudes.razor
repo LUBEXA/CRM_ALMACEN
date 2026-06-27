@@ -1,0 +1,278 @@
+@page "/solicitudes"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Solicitudes de pedido - CRM Almacén</PageTitle>
+
+<h1>📝 Solicitudes de pedido</h1>
+<p class="text-muted">
+    @(esAdmin
+        ? "Solicitudes de los clientes pendientes de surtir."
+        : "Pide al almacén que te surta mercancía.")
+</p>
+
+@* ---- Formulario de creación (solo Cliente) ---- *@
+@if (!esAdmin && clienteId is not null)
+{
+    <div class="card mb-4">
+        <div class="card-header">Nueva solicitud</div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label">Producto</label>
+                    <select class="form-select" @bind="productoSeleccionado">
+                        <option value="0">-- Selecciona --</option>
+                        @foreach (var p in misProductos)
+                        {
+                            <option value="@p.Id">@p.Codigo — @p.Nombre (disp: @p.CantidadDisponible)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Cantidad</label>
+                    <input type="number" min="1" class="form-control" @bind="cantidadSeleccionada" />
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-primary w-100" @onclick="AgregarRenglon">+ Agregar</button>
+                </div>
+            </div>
+
+            @if (renglones.Count > 0)
+            {
+                <table class="table table-sm mt-3">
+                    <thead><tr><th>Producto</th><th class="text-end">Cantidad</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var r in renglones)
+                        {
+                            <tr>
+                                <td>@r.Nombre</td>
+                                <td class="text-end">@r.Cantidad</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => QuitarRenglon(r)">Quitar</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <textarea class="form-control mb-2" placeholder="Notas (opcional)" @bind="notas"></textarea>
+                <button class="btn btn-primary" @onclick="EnviarSolicitudAsync">Enviar solicitud</button>
+            }
+
+            @if (mensaje is not null)
+            {
+                <div class="alert alert-success mt-3 mb-0">@mensaje</div>
+            }
+        </div>
+    </div>
+}
+
+@* ---- Listado ---- *@
+@if (solicitudes is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    @foreach (var s in solicitudes)
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <strong>Solicitud #@s.Id</strong>
+                    <span class="text-muted small ms-2">@s.Fecha.ToString("dd/MM/yyyy HH:mm")</span>
+                    @if (esAdmin)
+                    {
+                        <span class="ms-2">— @s.Cliente?.Nombre</span>
+                    }
+                </span>
+                <span class="badge @EstadoColor(s.Estado)">@s.Estado</span>
+            </div>
+            <div class="card-body">
+                <ul class="mb-2">
+                    @foreach (var d in s.Detalles)
+                    {
+                        <li>@d.Producto?.Codigo — @d.Producto?.Nombre: <strong>@d.Cantidad</strong></li>
+                    }
+                </ul>
+                @if (!string.IsNullOrWhiteSpace(s.Notas))
+                {
+                    <p class="text-muted small mb-2">Notas: @s.Notas</p>
+                }
+
+                @if (esAdmin && s.Estado == EstadoSolicitud.Pendiente)
+                {
+                    <button class="btn btn-sm btn-success me-2" @onclick="() => SurtirAsync(s.Id)">Aprobar y surtir</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RechazarAsync(s.Id)">Rechazar</button>
+                }
+            </div>
+        </div>
+    }
+    @if (solicitudes.Count == 0)
+    {
+        <p class="text-muted">No hay solicitudes.</p>
+    }
+    @if (errorAccion is not null)
+    {
+        <div class="alert alert-danger">@errorAccion</div>
+    }
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private List<SolicitudPedido>? solicitudes;
+    private List<Producto> misProductos = [];
+    private bool esAdmin;
+    private int? clienteId;
+    private string? usuario;
+
+    // Builder de la nueva solicitud
+    private int productoSeleccionado;
+    private int cantidadSeleccionada = 1;
+    private string? notas;
+    private readonly List<Renglon> renglones = [];
+    private string? mensaje;
+    private string? errorAccion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        esAdmin = user.EsAdmin();
+        clienteId = user.ClienteId();
+        usuario = user.Identity?.Name;
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var query = db.Solicitudes
+            .Include(s => s.Cliente)
+            .Include(s => s.Detalles).ThenInclude(d => d.Producto)
+            .AsQueryable();
+        if (clienteId is int id)
+            query = query.Where(s => s.ClienteId == id);
+
+        solicitudes = await query.OrderByDescending(s => s.Fecha).Take(100).ToListAsync();
+
+        if (clienteId is int cid)
+            misProductos = await db.Productos.Where(p => p.Activo && p.ClienteId == cid)
+                .OrderBy(p => p.Nombre).ToListAsync();
+    }
+
+    private void AgregarRenglon()
+    {
+        if (productoSeleccionado == 0 || cantidadSeleccionada <= 0) return;
+        var prod = misProductos.FirstOrDefault(p => p.Id == productoSeleccionado);
+        if (prod is null) return;
+
+        var existente = renglones.FirstOrDefault(r => r.ProductoId == prod.Id);
+        if (existente is not null)
+            existente.Cantidad += cantidadSeleccionada;
+        else
+            renglones.Add(new Renglon { ProductoId = prod.Id, Nombre = $"{prod.Codigo} — {prod.Nombre}", Cantidad = cantidadSeleccionada });
+
+        productoSeleccionado = 0;
+        cantidadSeleccionada = 1;
+    }
+
+    private void QuitarRenglon(Renglon r) => renglones.Remove(r);
+
+    private async Task EnviarSolicitudAsync()
+    {
+        if (renglones.Count == 0 || clienteId is null) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var solicitud = new SolicitudPedido
+        {
+            ClienteId = clienteId.Value,
+            Fecha = DateTime.Now,
+            Estado = EstadoSolicitud.Pendiente,
+            Notas = notas,
+            SolicitadoPor = usuario,
+            Detalles = renglones.Select(r => new DetalleSolicitud
+            {
+                ProductoId = r.ProductoId,
+                Cantidad = r.Cantidad
+            }).ToList()
+        };
+        db.Solicitudes.Add(solicitud);
+        await db.SaveChangesAsync();
+
+        mensaje = $"Solicitud enviada con {renglones.Count} producto(s).";
+        renglones.Clear();
+        notas = null;
+        await CargarAsync();
+    }
+
+    private async Task SurtirAsync(int solicitudId)
+    {
+        errorAccion = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var solicitud = await db.Solicitudes.Include(s => s.Detalles).ThenInclude(d => d.Producto)
+            .FirstOrDefaultAsync(s => s.Id == solicitudId);
+        if (solicitud is null || solicitud.Estado != EstadoSolicitud.Pendiente) return;
+
+        // Validar existencia de todos los renglones
+        foreach (var d in solicitud.Detalles)
+        {
+            if (d.Producto is null || d.Cantidad > d.Producto.CantidadDisponible)
+            {
+                errorAccion = $"No se puede surtir: existencia insuficiente de {d.Producto?.Nombre}.";
+                return;
+            }
+        }
+
+        // Generar salidas y descontar
+        foreach (var d in solicitud.Detalles)
+        {
+            db.Salidas.Add(new Salida
+            {
+                ProductoId = d.ProductoId,
+                Cantidad = d.Cantidad,
+                Referencia = $"Solicitud #{solicitud.Id}",
+                SolicitudPedidoId = solicitud.Id,
+                RegistradoPor = usuario,
+                Fecha = DateTime.Now
+            });
+            d.Producto!.CantidadDisponible -= d.Cantidad;
+        }
+        solicitud.Estado = EstadoSolicitud.Surtida;
+        solicitud.FechaAtencion = DateTime.Now;
+        solicitud.AtendidoPor = usuario;
+        await db.SaveChangesAsync();
+        await CargarAsync();
+    }
+
+    private async Task RechazarAsync(int solicitudId)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var solicitud = await db.Solicitudes.FindAsync(solicitudId);
+        if (solicitud is null) return;
+        solicitud.Estado = EstadoSolicitud.Rechazada;
+        solicitud.FechaAtencion = DateTime.Now;
+        solicitud.AtendidoPor = usuario;
+        await db.SaveChangesAsync();
+        await CargarAsync();
+    }
+
+    private static string EstadoColor(EstadoSolicitud e) => e switch
+    {
+        EstadoSolicitud.Pendiente => "text-bg-warning",
+        EstadoSolicitud.Aprobada => "text-bg-info",
+        EstadoSolicitud.Surtida => "text-bg-success",
+        EstadoSolicitud.Rechazada => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
+
+    private sealed class Renglon
+    {
+        public int ProductoId { get; set; }
+        public string Nombre { get; set; } = "";
+        public int Cantidad { get; set; }
+    }
+}

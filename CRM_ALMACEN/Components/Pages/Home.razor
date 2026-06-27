@@ -1,0 +1,91 @@
+@page "/"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Inicio - CRM Almacén</PageTitle>
+
+<AuthorizeView>
+    <Authorized Context="auth">
+        <h1>Bienvenido, @auth.User.NombreParaMostrar()</h1>
+        <p class="text-muted">
+            @(auth.User.EsAdmin()
+                ? "Panel general del almacén."
+                : "Resumen de tu mercancía en el almacén.")
+        </p>
+
+        @if (cargando)
+        {
+            <p><em>Cargando...</em></p>
+        }
+        else
+        {
+            <div class="row g-3 mt-2">
+                <div class="col-md-3 col-sm-6">
+                    <div class="card text-bg-primary h-100"><div class="card-body">
+                        <h6 class="card-title">Productos</h6>
+                        <p class="display-6 mb-0">@totalProductos</p>
+                    </div></div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card text-bg-success h-100"><div class="card-body">
+                        <h6 class="card-title">Existencia total</h6>
+                        <p class="display-6 mb-0">@totalExistencias</p>
+                    </div></div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card text-bg-warning h-100"><div class="card-body">
+                        <h6 class="card-title">Solicitudes pendientes</h6>
+                        <p class="display-6 mb-0">@solicitudesPendientes</p>
+                    </div></div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card text-bg-danger h-100"><div class="card-body">
+                        <h6 class="card-title">Productos bajo stock</h6>
+                        <p class="display-6 mb-0">@bajoStock</p>
+                    </div></div>
+                </div>
+            </div>
+
+            @if (bajoStock > 0)
+            {
+                <div class="alert alert-warning mt-4">
+                    ⚠️ Hay <strong>@bajoStock</strong> producto(s) en o por debajo de su stock mínimo.
+                    Revisa la sección <a href="existencias">Existencias</a>.
+                </div>
+            }
+        }
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private bool cargando = true;
+    private int totalProductos, totalExistencias, solicitudesPendientes, bajoStock;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        var clienteId = user.ClienteId();
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var productos = db.Productos.Where(p => p.Activo);
+        var solicitudes = db.Solicitudes.AsQueryable();
+        if (clienteId is int id)
+        {
+            productos = productos.Where(p => p.ClienteId == id);
+            solicitudes = solicitudes.Where(s => s.ClienteId == id);
+        }
+
+        totalProductos = await productos.CountAsync();
+        totalExistencias = await productos.SumAsync(p => (int?)p.CantidadDisponible) ?? 0;
+        bajoStock = await productos.CountAsync(p => p.CantidadDisponible <= p.StockMinimo);
+        solicitudesPendientes = await solicitudes.CountAsync(s => s.Estado == EstadoSolicitud.Pendiente);
+
+        cargando = false;
+    }
+}

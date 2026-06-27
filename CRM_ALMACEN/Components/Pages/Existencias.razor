@@ -1,0 +1,108 @@
+@page "/existencias"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Existencias - CRM Almacén</PageTitle>
+
+<h1>📋 Existencias</h1>
+<p class="text-muted">Inventario actual en el almacén.</p>
+
+<div class="row mb-3">
+    <div class="col-md-5">
+        <input class="form-control" placeholder="Buscar por código o nombre..."
+               @bind="filtro" @bind:event="oninput" />
+    </div>
+</div>
+
+@if (productos is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    var lista = Filtrados().ToList();
+    <p class="text-muted small">@lista.Count producto(s)</p>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Producto</th>
+                    @if (esAdmin)
+                    {
+                        <th>Cliente</th>
+                    }
+                    <th>Unidad</th>
+                    <th class="text-end">Disponible</th>
+                    <th class="text-end">Mínimo</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in lista)
+                {
+                    <tr>
+                        <td><code>@p.Codigo</code></td>
+                        <td>@p.Nombre</td>
+                        @if (esAdmin)
+                        {
+                            <td>@p.Cliente?.Nombre</td>
+                        }
+                        <td>@p.UnidadMedida</td>
+                        <td class="text-end fw-bold">@p.CantidadDisponible</td>
+                        <td class="text-end">@p.StockMinimo</td>
+                        <td>
+                            @if (p.CantidadDisponible <= p.StockMinimo)
+                            {
+                                <span class="badge text-bg-danger">Bajo stock</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">OK</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (lista.Count == 0)
+                {
+                    <tr><td colspan="@(esAdmin ? 7 : 6)" class="text-center text-muted py-4">Sin productos.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private List<Producto>? productos;
+    private bool esAdmin;
+    private string filtro = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        esAdmin = user.EsAdmin();
+        var clienteId = user.ClienteId();
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var query = db.Productos.Include(p => p.Cliente).Where(p => p.Activo);
+        if (clienteId is int id)
+            query = query.Where(p => p.ClienteId == id);
+
+        productos = await query.OrderBy(p => p.Nombre).ToListAsync();
+    }
+
+    private IEnumerable<Producto> Filtrados()
+    {
+        if (productos is null) return [];
+        if (string.IsNullOrWhiteSpace(filtro)) return productos;
+        var f = filtro.Trim();
+        return productos.Where(p =>
+            p.Codigo.Contains(f, StringComparison.OrdinalIgnoreCase) ||
+            p.Nombre.Contains(f, StringComparison.OrdinalIgnoreCase));
+    }
+}

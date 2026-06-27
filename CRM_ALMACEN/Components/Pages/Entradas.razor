@@ -1,0 +1,164 @@
+@page "/entradas"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Entradas - CRM Almacén</PageTitle>
+
+<h1>📥 Entradas</h1>
+<p class="text-muted">Mercancía que ingresa al almacén y suma existencia.</p>
+
+@if (esAdmin)
+{
+    <div class="card mb-4">
+        <div class="card-header">Registrar nueva entrada</div>
+        <div class="card-body">
+            <EditForm Model="nueva" OnValidSubmit="RegistrarAsync" FormName="formEntrada">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label">Producto</label>
+                        <InputSelect class="form-select" @bind-Value="nueva.ProductoId">
+                            <option value="0">-- Selecciona --</option>
+                            @foreach (var p in productosDisponibles)
+                            {
+                                <option value="@p.Id">@p.Codigo — @p.Nombre (@p.Cliente?.Nombre)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Cantidad</label>
+                        <InputNumber class="form-control" @bind-Value="nueva.Cantidad" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Referencia</label>
+                        <InputText class="form-control" @bind-Value="nueva.Referencia" placeholder="Remisión / factura" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100">Registrar</button>
+                    </div>
+                    <div class="col-12">
+                        <InputText class="form-control" @bind-Value="nueva.Observaciones" placeholder="Observaciones (opcional)" />
+                    </div>
+                </div>
+                <ValidationSummary class="text-danger mt-2" />
+            </EditForm>
+            @if (mensaje is not null)
+            {
+                <div class="alert alert-success mt-3 mb-0">@mensaje</div>
+            }
+        </div>
+    </div>
+}
+
+@if (entradas is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Producto</th>
+                    <th class="text-end">Cantidad</th>
+                    <th>Referencia</th>
+                    <th>Registró</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in entradas)
+                {
+                    <tr>
+                        <td>@e.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@e.Producto?.Codigo — @e.Producto?.Nombre</td>
+                        <td class="text-end fw-bold text-success">+@e.Cantidad</td>
+                        <td>@e.Referencia</td>
+                        <td class="small text-muted">@e.RegistradoPor</td>
+                    </tr>
+                }
+                @if (entradas.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">Sin entradas registradas.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private List<Entrada>? entradas;
+    private List<Producto> productosDisponibles = [];
+    private bool esAdmin;
+    private int? clienteId;
+    private string? usuario;
+    private string? mensaje;
+
+    private NuevaEntrada nueva = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        esAdmin = user.EsAdmin();
+        clienteId = user.ClienteId();
+        usuario = user.Identity?.Name;
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var query = db.Entradas.Include(e => e.Producto).ThenInclude(p => p!.Cliente).AsQueryable();
+        if (clienteId is int id)
+            query = query.Where(e => e.Producto!.ClienteId == id);
+
+        entradas = await query.OrderByDescending(e => e.Fecha).Take(200).ToListAsync();
+
+        if (esAdmin)
+            productosDisponibles = await db.Productos.Include(p => p.Cliente)
+                .Where(p => p.Activo).OrderBy(p => p.Nombre).ToListAsync();
+    }
+
+    private async Task RegistrarAsync()
+    {
+        mensaje = null;
+        if (nueva.ProductoId == 0 || nueva.Cantidad <= 0)
+            return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var producto = await db.Productos.FindAsync(nueva.ProductoId);
+        if (producto is null) return;
+
+        db.Entradas.Add(new Entrada
+        {
+            ProductoId = producto.Id,
+            Cantidad = nueva.Cantidad,
+            Referencia = nueva.Referencia,
+            Observaciones = nueva.Observaciones,
+            RegistradoPor = usuario,
+            Fecha = DateTime.Now
+        });
+        producto.CantidadDisponible += nueva.Cantidad;
+        await db.SaveChangesAsync();
+
+        mensaje = $"Entrada registrada: +{nueva.Cantidad} de {producto.Nombre}.";
+        nueva = new();
+        await CargarAsync();
+    }
+
+    private sealed class NuevaEntrada
+    {
+        public int ProductoId { get; set; }
+        [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue, ErrorMessage = "Cantidad debe ser mayor a 0.")]
+        public int Cantidad { get; set; } = 1;
+        public string? Referencia { get; set; }
+        public string? Observaciones { get; set; }
+    }
+}

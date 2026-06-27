@@ -1,0 +1,132 @@
+@page "/productos"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Productos - CRM Almacén</PageTitle>
+
+<h1>📦 Productos</h1>
+<p class="text-muted">Catálogo de artículos por cliente.</p>
+
+<div class="card mb-4">
+    <div class="card-header">Registrar nuevo producto</div>
+    <div class="card-body">
+        <EditForm Model="nuevo" OnValidSubmit="GuardarAsync" FormName="formProducto">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Cliente</label>
+                    <InputSelect class="form-select" @bind-Value="nuevo.ClienteId">
+                        <option value="0">-- Selecciona --</option>
+                        @foreach (var c in clientes)
+                        {
+                            <option value="@c.Id">@c.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Código</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Codigo" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Nombre</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Nombre" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Unidad</label>
+                    <InputText class="form-control" @bind-Value="nuevo.UnidadMedida" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Existencia inicial</label>
+                    <InputNumber class="form-control" @bind-Value="nuevo.CantidadDisponible" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Stock mínimo</label>
+                    <InputNumber class="form-control" @bind-Value="nuevo.StockMinimo" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Descripción</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Descripcion" />
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Guardar producto</button>
+            <ValidationSummary class="text-danger mt-2" />
+        </EditForm>
+        @if (mensaje is not null)
+        {
+            <div class="alert @(error ? "alert-danger" : "alert-success") mt-3 mb-0">@mensaje</div>
+        }
+    </div>
+</div>
+
+@if (productos is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead><tr><th>Código</th><th>Nombre</th><th>Cliente</th><th>Unidad</th><th class="text-end">Disponible</th></tr></thead>
+        <tbody>
+            @foreach (var p in productos)
+            {
+                <tr>
+                    <td><code>@p.Codigo</code></td>
+                    <td>@p.Nombre</td>
+                    <td>@p.Cliente?.Nombre</td>
+                    <td>@p.UnidadMedida</td>
+                    <td class="text-end fw-bold">@p.CantidadDisponible</td>
+                </tr>
+            }
+            @if (productos.Count == 0)
+            {
+                <tr><td colspan="5" class="text-center text-muted py-4">Sin productos.</td></tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Producto>? productos;
+    private List<Cliente> clientes = [];
+    private Producto nuevo = new();
+    private string? mensaje;
+    private bool error;
+
+    protected override async Task OnInitializedAsync() => await CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        clientes = await db.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+        productos = await db.Productos.Include(p => p.Cliente).OrderBy(p => p.Nombre).ToListAsync();
+    }
+
+    private async Task GuardarAsync()
+    {
+        mensaje = null;
+        error = false;
+        if (nuevo.ClienteId == 0)
+        {
+            error = true;
+            mensaje = "Debes seleccionar un cliente.";
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var duplicado = await db.Productos.AnyAsync(p => p.ClienteId == nuevo.ClienteId && p.Codigo == nuevo.Codigo);
+        if (duplicado)
+        {
+            error = true;
+            mensaje = "Ya existe un producto con ese código para ese cliente.";
+            return;
+        }
+
+        db.Productos.Add(nuevo);
+        await db.SaveChangesAsync();
+        mensaje = $"Producto '{nuevo.Nombre}' guardado.";
+        nuevo = new();
+        await CargarAsync();
+    }
+}

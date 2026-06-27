@@ -1,0 +1,98 @@
+@page "/clientes"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Clientes - CRM Almacén</PageTitle>
+
+<h1>👥 Clientes</h1>
+<p class="text-muted">Empresas que almacenan mercancía.</p>
+
+<div class="card mb-4">
+    <div class="card-header">Registrar nuevo cliente</div>
+    <div class="card-body">
+        <EditForm Model="nuevo" OnValidSubmit="GuardarAsync" FormName="formCliente">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Nombre / Razón social</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Nombre" />
+                    <ValidationMessage For="() => nuevo.Nombre" class="text-danger" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">RFC</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Rfc" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Teléfono</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Telefono" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Correo</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Correo" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Dirección</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Direccion" />
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Guardar cliente</button>
+        </EditForm>
+        @if (mensaje is not null)
+        {
+            <div class="alert alert-success mt-3 mb-0">@mensaje</div>
+        }
+    </div>
+</div>
+
+@if (clientes is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead><tr><th>Nombre</th><th>RFC</th><th>Correo</th><th>Teléfono</th><th>Productos</th></tr></thead>
+        <tbody>
+            @foreach (var c in clientes)
+            {
+                <tr>
+                    <td>@c.Nombre</td>
+                    <td>@c.Rfc</td>
+                    <td>@c.Correo</td>
+                    <td>@c.Telefono</td>
+                    <td>@c.Productos.Count</td>
+                </tr>
+            }
+            @if (clientes.Count == 0)
+            {
+                <tr><td colspan="5" class="text-center text-muted py-4">Sin clientes.</td></tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Cliente>? clientes;
+    private Cliente nuevo = new();
+    private string? mensaje;
+
+    protected override async Task OnInitializedAsync() => await CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        clientes = await db.Clientes.Include(c => c.Productos).OrderBy(c => c.Nombre).ToListAsync();
+    }
+
+    private async Task GuardarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Clientes.Add(nuevo);
+        await db.SaveChangesAsync();
+        mensaje = $"Cliente '{nuevo.Nombre}' guardado.";
+        nuevo = new();
+        await CargarAsync();
+    }
+}

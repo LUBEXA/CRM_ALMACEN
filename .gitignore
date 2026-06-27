@@ -1,0 +1,36 @@
+# ---- Carpetas de compilación de .NET ----
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+
+# ---- Visual Studio ----
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ---- Archivos de usuario / locales ----
+*.rsuser
+launchSettings.local.json
+appsettings.*.local.json
+
+# ---- Resultados de pruebas y cobertura ----
+[Tt]est[Rr]esult*/
+*.coverage
+*.coveragexml
+
+# ---- Logs ----
+*.log
+
+# ---- Paquetes / herramientas ----
+.nuget/
+packages/
+*.nupkg
+
+# ---- Sistema operativo ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.tmp
