@@ -15,6 +15,7 @@ public class AdditionalUserClaimsPrincipalFactory(
     : UserClaimsPrincipalFactory<ApplicationUser, IdentityRole>(userManager, roleManager, options)
 {
     public const string ClienteIdClaim = "ClienteId";
+    public const string RequiereCambioPasswordClaim = "RequiereCambioPassword";
 
     public override async Task<ClaimsPrincipal> CreateAsync(ApplicationUser user)
     {
@@ -23,6 +24,9 @@ public class AdditionalUserClaimsPrincipalFactory(
 
         if (user.ClienteId is int clienteId)
             identity.AddClaim(new Claim(ClienteIdClaim, clienteId.ToString()));
+
+        if (user.RequiereCambioPassword)
+            identity.AddClaim(new Claim(RequiereCambioPasswordClaim, "true"));
 
         if (!string.IsNullOrWhiteSpace(user.NombreCompleto))
             identity.AddClaim(new Claim("NombreCompleto", user.NombreCompleto));

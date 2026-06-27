@@ -14,6 +14,10 @@ public static class ClaimsPrincipalExtensions
         return int.TryParse(valor, out var id) ? id : null;
     }
 
+    /// <summary>True si el usuario debe cambiar su contraseña temporal.</summary>
+    public static bool RequiereCambioPassword(this ClaimsPrincipal user) =>
+        user.HasClaim(AdditionalUserClaimsPrincipalFactory.RequiereCambioPasswordClaim, "true");
+
     public static string NombreParaMostrar(this ClaimsPrincipal user) =>
         user.FindFirstValue("NombreCompleto")
         ?? user.Identity?.Name

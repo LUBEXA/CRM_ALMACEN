@@ -14,7 +14,7 @@
     <div class="card mb-3">
         <div class="card-body">
             <label class="form-label">Cliente</label>
-            <select class="form-select" style="max-width:420px" @bind="clienteSeleccionado" @bind:after="CargarAsync">
+            <select class="form-select" style="max-width:420px" @bind="clienteSeleccionado" @bind:after="CambiarClienteAsync">
                 <option value="0">-- Selecciona un cliente --</option>
                 @foreach (var c in clientes)
                 {
@@ -35,39 +35,90 @@ else if (clienteId is null)
 }
 else
 {
-    @* ---------- Periodo actual ---------- *@
+    @* ---------- Selector de periodo ---------- *@
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <label class="form-label mb-0 fw-semibold">Periodo:</label>
+        <select class="form-select" style="max-width:240px" @bind="periodoKey" @bind:after="CargarPeriodoAsync">
+            @foreach (var p in periodos)
+            {
+                <option value="@(p.Anio * 100 + p.Mes)">@NombresMes.Get(p.Mes) @p.Anio</option>
+            }
+        </select>
+    </div>
+
+    @* ---------- Estado de cuenta del periodo ---------- *@
     <div class="card mb-4">
         <div class="card-body p-4">
-            <h5 class="text-primary mb-3">Periodo actual <span class="text-muted fs-6">— @NombresMes.Get(DateTime.Now.Month) @DateTime.Now.Year</span></h5>
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h5 class="text-primary mb-0">Estado de cuenta <span class="text-muted fs-6">— @NombresMes.Get(PeriodoMes) @PeriodoAnio</span></h5>
+                <span class="badge fs-6 @EstadoClase">@EstadoTexto</span>
+            </div>
+
+            <p class="text-muted small">Esto es lo que incluye tu servicio en este periodo:</p>
 
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
                     <thead>
-                        <tr><th>Concepto</th><th class="text-center">Cantidad</th><th class="text-end">Monto</th></tr>
+                        <tr>
+                            <th>Concepto</th>
+                            <th class="text-center">Cantidad</th>
+                            <th class="text-end">Importe</th>
+                            @if (esAdmin) { <th></th> }
+                        </tr>
                     </thead>
                     <tbody>
                         @foreach (var c in cargosPeriodo)
                         {
                             <tr>
-                                <td>@c.Concepto</td>
-                                <td class="text-center">@c.Cantidad</td>
-                                <td class="text-end">@Money(c.Monto)</td>
+                                @if (esAdmin)
+                                {
+                                    <td><input class="form-control form-control-sm" @bind="c.Concepto" /></td>
+                                    <td style="max-width:110px"><input type="number" min="1" class="form-control form-control-sm text-center" @bind="c.Cantidad" /></td>
+                                    <td style="max-width:160px">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" step="0.01" min="0" class="form-control text-end" @bind="c.Monto" />
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarCargoAsync(c.Id)" title="Eliminar">
+                                            <span class="bi bi-trash"></span>
+                                        </button>
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td>@c.Concepto</td>
+                                    <td class="text-center">@c.Cantidad</td>
+                                    <td class="text-end">@Money(c.Monto)</td>
+                                }
                             </tr>
                         }
                         @if (cargosPeriodo.Count == 0)
                         {
-                            <tr><td colspan="3" class="text-center text-muted py-3">Sin cargos en el periodo actual.</td></tr>
+                            <tr><td colspan="@(esAdmin ? 4 : 3)" class="text-center text-muted py-3">Sin cargos en este periodo.</td></tr>
                         }
                     </tbody>
                     @if (cargosPeriodo.Count > 0)
                     {
                         <tfoot>
                             <tr class="periodo-total">
-                                <td class="fw-bold">Total a pagar</td>
+                                <td class="fw-bold">Total del periodo</td>
                                 <td></td>
-                                <td class="text-end">
-                                    <span class="btn btn-primary disabled w-100">Pagar @Money(TotalPeriodo)</span>
-                                </td>
+                                <td class="text-end fw-bold">@Money(TotalCargos)</td>
+                                @if (esAdmin) { <td></td> }
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Pagado</td>
+                                <td></td>
+                                <td class="text-end text-success">@Money(TotalPagado)</td>
+                                @if (esAdmin) { <td></td> }
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold">Saldo pendiente</td>
+                                <td></td>
+                                <td class="text-end fw-semibold @(Saldo > 0 ? "text-danger" : "text-success")">@Money(Saldo)</td>
+                                @if (esAdmin) { <td></td> }
                             </tr>
                         </tfoot>
                     }
@@ -77,31 +128,44 @@ else
             @if (esAdmin)
             {
                 <hr />
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="GenerarDesdeTarifarioAsync" disabled="@procesando">
+                        <span class="bi bi-magic"></span> Generar cargos desde el tarifario
+                    </button>
+                    @if (cargosPeriodo.Count > 0)
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick="GuardarCambiosCargosAsync" disabled="@procesando">
+                            <span class="bi bi-save"></span> Guardar cambios
+                        </button>
+                    }
+                    @if (mensajeCargos is not null) { <span class="text-success align-self-center small">@mensajeCargos</span> }
+                </div>
+
                 <div class="row g-2 align-items-end">
                     <div class="col-md-5">
-                        <label class="form-label small">Concepto</label>
-                        <input class="form-control form-control-sm" @bind="nuevoCargo.Concepto" placeholder="Renta de tarima mediana" />
+                        <label class="form-label small">Concepto (manual)</label>
+                        <input class="form-control form-control-sm" @bind="nuevoCargo.Concepto" placeholder="Ej. Maniobra extra" />
                     </div>
                     <div class="col-md-2">
                         <label class="form-label small">Cantidad</label>
-                        <input type="number" class="form-control form-control-sm" @bind="nuevoCargo.Cantidad" />
+                        <input type="number" min="1" class="form-control form-control-sm" @bind="nuevoCargo.Cantidad" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small">Monto (MXN)</label>
-                        <input type="number" step="0.01" class="form-control form-control-sm" @bind="nuevoCargo.Monto" />
+                        <label class="form-label small">Importe (MXN)</label>
+                        <input type="number" step="0.01" min="0" class="form-control form-control-sm" @bind="nuevoCargo.Monto" />
                     </div>
                     <div class="col-md-2">
-                        <button class="btn btn-sm btn-success w-100" @onclick="AgregarCargoAsync">+ Agregar cargo</button>
+                        <button class="btn btn-sm btn-success w-100" @onclick="AgregarCargoAsync" disabled="@procesando">+ Agregar</button>
                     </div>
                 </div>
             }
         </div>
     </div>
 
-    @* ---------- Historial de pagos ---------- *@
-    <div class="card">
+    @* ---------- Pagos y facturas del periodo ---------- *@
+    <div class="card mb-4">
         <div class="card-body p-4">
-            <h5 class="text-primary mb-3">Historial de pagos y facturación</h5>
+            <h5 class="text-primary mb-3">Pagos y facturas de @NombresMes.Get(PeriodoMes) @PeriodoAnio</h5>
 
             <div class="table-responsive">
                 <table class="table align-middle">
@@ -110,14 +174,108 @@ else
                             <th>Fecha</th>
                             <th class="text-end">Monto</th>
                             <th>Método de pago</th>
+                            <th>Referencia</th>
                             <th class="text-center">XML</th>
                             <th class="text-center">PDF</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var p in pagos)
+                        @foreach (var p in pagosPeriodo)
                         {
                             <tr>
+                                <td>@p.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="text-end fw-semibold">@Money(p.Monto)</td>
+                                <td>@p.MetodoTexto</td>
+                                <td>@(string.IsNullOrEmpty(p.Referencia) ? "—" : p.Referencia)</td>
+                                <td class="text-center">
+                                    @if (!string.IsNullOrEmpty(p.XmlArchivo))
+                                    {
+                                        <a href="@p.XmlArchivo" target="_blank" title="Descargar XML"><span class="bi bi-filetype-xml fs-5"></span></a>
+                                    }
+                                    else { <span class="text-muted">—</span> }
+                                </td>
+                                <td class="text-center">
+                                    @if (!string.IsNullOrEmpty(p.PdfArchivo))
+                                    {
+                                        <a href="@p.PdfArchivo" target="_blank" title="Descargar PDF"><span class="bi bi-filetype-pdf fs-5 text-danger"></span></a>
+                                    }
+                                    else { <span class="text-muted">—</span> }
+                                </td>
+                            </tr>
+                        }
+                        @if (pagosPeriodo.Count == 0)
+                        {
+                            <tr><td colspan="6" class="text-center text-muted py-3">Sin pagos en este periodo.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (esAdmin)
+            {
+                <hr />
+                <h6 class="mb-3">Registrar pago de este periodo</h6>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small">Fecha</label>
+                        <input type="datetime-local" class="form-control form-control-sm" @bind="nuevoPago.Fecha" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Monto (MXN)</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm" @bind="nuevoPago.Monto" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Método</label>
+                        <select class="form-select form-select-sm" @bind="nuevoPago.MetodoPago">
+                            @foreach (var m in Enum.GetValues<MetodoPago>())
+                            {
+                                <option value="@m">@MetodoTexto(m)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Referencia (opcional)</label>
+                        <input class="form-control form-control-sm" @bind="nuevoPago.Referencia" placeholder="Ej. TRX-001" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">XML factura</label>
+                        <InputFile OnChange="SubirXml" class="form-control form-control-sm" accept=".xml" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">PDF factura</label>
+                        <InputFile OnChange="SubirPdf" class="form-control form-control-sm" accept=".pdf" />
+                    </div>
+                    <div class="col-12 mt-2">
+                        <button class="btn btn-sm btn-primary" @onclick="AgregarPagoAsync" disabled="@procesando">Registrar pago</button>
+                        @if (subiendo) { <span class="text-muted ms-2 small">Subiendo archivo...</span> }
+                        @if (mensajePago is not null) { <span class="text-success ms-2 small">@mensajePago</span> }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ---------- Historial completo ---------- *@
+    <div class="card">
+        <div class="card-body p-4">
+            <h5 class="text-primary mb-3">Historial completo de pagos</h5>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Periodo</th>
+                            <th>Fecha</th>
+                            <th class="text-end">Monto</th>
+                            <th>Método de pago</th>
+                            <th class="text-center">XML</th>
+                            <th class="text-center">PDF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in pagosTodos)
+                        {
+                            <tr>
+                                <td>@p.PeriodoTexto</td>
                                 <td>@p.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
                                 <td class="text-end fw-semibold">@Money(p.Monto)</td>
                                 <td>@p.MetodoTexto</td>
@@ -137,51 +295,13 @@ else
                                 </td>
                             </tr>
                         }
-                        @if (pagos.Count == 0)
+                        @if (pagosTodos.Count == 0)
                         {
-                            <tr><td colspan="5" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>
+                            <tr><td colspan="6" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>
                         }
                     </tbody>
                 </table>
             </div>
-
-            @if (esAdmin)
-            {
-                <hr />
-                <h6 class="mb-3">Registrar pago</h6>
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label small">Fecha</label>
-                        <input type="datetime-local" class="form-control form-control-sm" @bind="nuevoPago.Fecha" />
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small">Monto (MXN)</label>
-                        <input type="number" step="0.01" class="form-control form-control-sm" @bind="nuevoPago.Monto" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small">Método</label>
-                        <select class="form-select form-select-sm" @bind="nuevoPago.MetodoPago">
-                            @foreach (var m in Enum.GetValues<MetodoPago>())
-                            {
-                                <option value="@m">@MetodoTexto(m)</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small">XML factura</label>
-                        <InputFile OnChange="SubirXml" class="form-control form-control-sm" accept=".xml" />
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small">PDF factura</label>
-                        <InputFile OnChange="SubirPdf" class="form-control form-control-sm" accept=".pdf" />
-                    </div>
-                    <div class="col-12 mt-2">
-                        <button class="btn btn-sm btn-primary" @onclick="AgregarPagoAsync">Registrar pago</button>
-                        @if (subiendo) { <span class="text-muted ms-2 small">Subiendo archivo...</span> }
-                        @if (mensaje is not null) { <span class="text-success ms-2 small">@mensaje</span> }
-                    </div>
-                </div>
-            }
         </div>
     </div>
 }
@@ -192,21 +312,42 @@ else
 
     private bool esAdmin;
     private bool cargando = true;
+    private bool procesando;
     private int? clienteId;
     private string? usuario;
 
     private List<Cliente> clientes = [];
     private int clienteSeleccionado;
 
+    // Periodo seleccionado, codificado como Anio*100 + Mes.
+    private int periodoKey;
+    private int PeriodoAnio => periodoKey / 100;
+    private int PeriodoMes => periodoKey % 100;
+    private List<(int Anio, int Mes)> periodos = [];
+
     private List<Cargo> cargosPeriodo = [];
-    private List<Pago> pagos = [];
+    private List<Pago> pagosPeriodo = [];
+    private List<Pago> pagosTodos = [];
 
     private Cargo nuevoCargo = new();
     private Pago nuevoPago = new() { Fecha = DateTime.Now };
     private bool subiendo;
-    private string? mensaje;
+    private string? mensajePago;
+    private string? mensajeCargos;
 
-    private decimal TotalPeriodo => cargosPeriodo.Sum(c => c.Monto);
+    private decimal TotalCargos => cargosPeriodo.Sum(c => c.Monto);
+    private decimal TotalPagado => pagosPeriodo.Sum(p => p.Monto);
+    private decimal Saldo => TotalCargos - TotalPagado;
+
+    private string EstadoTexto =>
+        TotalCargos == 0 ? "Sin cargos" :
+        Saldo <= 0 ? "Pagado" :
+        TotalPagado > 0 ? "Pago parcial" : "Pendiente";
+
+    private string EstadoClase =>
+        TotalCargos == 0 ? "text-bg-secondary" :
+        Saldo <= 0 ? "text-bg-success" :
+        TotalPagado > 0 ? "text-bg-warning" : "text-bg-danger";
 
     protected override async Task OnInitializedAsync()
     {
@@ -223,46 +364,169 @@ else
         else
         {
             clienteId = user.ClienteId();
-            await CargarAsync();
+            await CambiarClienteAsync();
         }
     }
 
-    private async Task CargarAsync()
+    private async Task CambiarClienteAsync()
     {
         cargando = true;
         if (esAdmin)
             clienteId = clienteSeleccionado == 0 ? null : clienteSeleccionado;
 
+        ResetForms();
+
         if (clienteId is int id)
         {
-            var ahora = DateTime.Now;
-            await using var db = await DbFactory.CreateDbContextAsync();
-            cargosPeriodo = await db.Cargos
-                .Where(c => c.ClienteId == id && c.Anio == ahora.Year && c.Mes == ahora.Month)
-                .OrderBy(c => c.Id).ToListAsync();
-            pagos = await db.Pagos
-                .Where(p => p.ClienteId == id)
-                .OrderByDescending(p => p.Fecha).Take(100).ToListAsync();
+            await CargarPeriodosAsync(id);
+            await CargarPeriodoAsync();
         }
         cargando = false;
+    }
+
+    private async Task CargarPeriodosAsync(int id)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var deCargos = await db.Cargos.Where(c => c.ClienteId == id)
+            .Select(c => new { c.Anio, c.Mes }).Distinct().ToListAsync();
+        var dePagos = await db.Pagos.Where(p => p.ClienteId == id)
+            .Select(p => new { p.Anio, p.Mes }).Distinct().ToListAsync();
+
+        var ahora = DateTime.Now;
+        var conjunto = deCargos.Concat(dePagos)
+            .Select(x => (x.Anio, x.Mes))
+            .Append((ahora.Year, ahora.Month))
+            .Distinct()
+            .OrderByDescending(p => p.Item1).ThenByDescending(p => p.Item2)
+            .ToList();
+
+        periodos = conjunto;
+
+        // Por defecto, el periodo actual.
+        if (periodoKey == 0 || !periodos.Any(p => p.Anio * 100 + p.Mes == periodoKey))
+            periodoKey = ahora.Year * 100 + ahora.Month;
+
+        // Historial completo (todos los periodos).
+        pagosTodos = await db.Pagos.Where(p => p.ClienteId == id)
+            .OrderByDescending(p => p.Fecha).Take(200).ToListAsync();
+    }
+
+    private async Task CargarPeriodoAsync()
+    {
+        if (clienteId is not int id) return;
+
+        mensajeCargos = null;
+        mensajePago = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        cargosPeriodo = await db.Cargos
+            .Where(c => c.ClienteId == id && c.Anio == PeriodoAnio && c.Mes == PeriodoMes)
+            .OrderBy(c => c.Id).ToListAsync();
+        pagosPeriodo = await db.Pagos
+            .Where(p => p.ClienteId == id && p.Anio == PeriodoAnio && p.Mes == PeriodoMes)
+            .OrderByDescending(p => p.Fecha).ToListAsync();
+    }
+
+    private async Task GenerarDesdeTarifarioAsync()
+    {
+        if (clienteId is not int id) return;
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var tarifario = await db.CostosServicio.Where(c => c.ClienteId == id).ToListAsync();
+            if (tarifario.Count == 0)
+            {
+                mensajeCargos = "Este cliente no tiene tarifario. Defínelo en Clientes → Editar → Costos del servicio.";
+                return;
+            }
+
+            // Conceptos que ya existen en el periodo, para no duplicar.
+            var existentes = await db.Cargos
+                .Where(c => c.ClienteId == id && c.Anio == PeriodoAnio && c.Mes == PeriodoMes)
+                .Select(c => c.Concepto).ToListAsync();
+
+            var agregados = 0;
+            foreach (var t in tarifario)
+            {
+                if (existentes.Any(e => e.Equals(t.Concepto, StringComparison.OrdinalIgnoreCase))) continue;
+                db.Cargos.Add(new Cargo
+                {
+                    ClienteId = id,
+                    Anio = PeriodoAnio,
+                    Mes = PeriodoMes,
+                    Concepto = t.Concepto,
+                    Cantidad = 1,
+                    Monto = t.ImporteNeto
+                });
+                agregados++;
+            }
+            await db.SaveChangesAsync();
+            mensajeCargos = agregados > 0
+                ? $"{agregados} concepto(s) agregado(s) desde el tarifario."
+                : "Todos los conceptos del tarifario ya estaban en este periodo.";
+            await CargarPeriodoAsync();
+        }
+        finally { procesando = false; }
     }
 
     private async Task AgregarCargoAsync()
     {
         if (clienteId is not int id || string.IsNullOrWhiteSpace(nuevoCargo.Concepto) || nuevoCargo.Monto < 0) return;
-        await using var db = await DbFactory.CreateDbContextAsync();
-        db.Cargos.Add(new Cargo
+        procesando = true;
+        try
         {
-            ClienteId = id,
-            Anio = DateTime.Now.Year,
-            Mes = DateTime.Now.Month,
-            Concepto = nuevoCargo.Concepto,
-            Cantidad = nuevoCargo.Cantidad <= 0 ? 1 : nuevoCargo.Cantidad,
-            Monto = nuevoCargo.Monto
-        });
-        await db.SaveChangesAsync();
-        nuevoCargo = new();
-        await CargarAsync();
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Cargos.Add(new Cargo
+            {
+                ClienteId = id,
+                Anio = PeriodoAnio,
+                Mes = PeriodoMes,
+                Concepto = nuevoCargo.Concepto.Trim(),
+                Cantidad = nuevoCargo.Cantidad <= 0 ? 1 : nuevoCargo.Cantidad,
+                Monto = nuevoCargo.Monto
+            });
+            await db.SaveChangesAsync();
+            nuevoCargo = new();
+            await CargarPeriodoAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task GuardarCambiosCargosAsync()
+    {
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            foreach (var c in cargosPeriodo)
+            {
+                c.Concepto = c.Concepto.Trim();
+                if (c.Cantidad < 1) c.Cantidad = 1;
+                db.Cargos.Update(c);
+            }
+            await db.SaveChangesAsync();
+            mensajeCargos = "Cambios guardados.";
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task EliminarCargoAsync(int cargoId)
+    {
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var cargo = await db.Cargos.FindAsync(cargoId);
+            if (cargo is not null)
+            {
+                db.Cargos.Remove(cargo);
+                await db.SaveChangesAsync();
+            }
+            await CargarPeriodoAsync();
+        }
+        finally { procesando = false; }
     }
 
     private async Task SubirXml(InputFileChangeEventArgs e)
@@ -284,21 +548,38 @@ else
     private async Task AgregarPagoAsync()
     {
         if (clienteId is not int id || nuevoPago.Monto <= 0) return;
-        await using var db = await DbFactory.CreateDbContextAsync();
-        db.Pagos.Add(new Pago
+        procesando = true;
+        try
         {
-            ClienteId = id,
-            Fecha = nuevoPago.Fecha,
-            Monto = nuevoPago.Monto,
-            MetodoPago = nuevoPago.MetodoPago,
-            XmlArchivo = nuevoPago.XmlArchivo,
-            PdfArchivo = nuevoPago.PdfArchivo,
-            RegistradoPor = usuario
-        });
-        await db.SaveChangesAsync();
-        mensaje = "Pago registrado.";
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Pagos.Add(new Pago
+            {
+                ClienteId = id,
+                Anio = PeriodoAnio,
+                Mes = PeriodoMes,
+                Fecha = nuevoPago.Fecha,
+                Monto = nuevoPago.Monto,
+                MetodoPago = nuevoPago.MetodoPago,
+                Referencia = nuevoPago.Referencia,
+                XmlArchivo = nuevoPago.XmlArchivo,
+                PdfArchivo = nuevoPago.PdfArchivo,
+                RegistradoPor = usuario
+            });
+            await db.SaveChangesAsync();
+            mensajePago = "Pago registrado.";
+            nuevoPago = new() { Fecha = DateTime.Now };
+            await CargarPeriodosAsync(id);
+            await CargarPeriodoAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private void ResetForms()
+    {
+        nuevoCargo = new();
         nuevoPago = new() { Fecha = DateTime.Now };
-        await CargarAsync();
+        mensajeCargos = null;
+        mensajePago = null;
     }
 
     private static string Money(decimal m) => $"${m:N2} MXN";

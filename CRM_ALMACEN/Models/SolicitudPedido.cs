@@ -8,7 +8,8 @@ public enum EstadoSolicitud
     Pendiente = 0,
     Aprobada = 1,
     Surtida = 2,
-    Rechazada = 3
+    Rechazada = 3,
+    Entregada = 4
 }
 
 /// <summary>

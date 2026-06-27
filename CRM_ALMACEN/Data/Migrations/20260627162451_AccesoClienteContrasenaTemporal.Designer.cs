@@ -3,6 +3,7 @@ using System;
 using CRM_ALMACEN.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CRM_ALMACEN.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260627162451_AccesoClienteContrasenaTemporal")]
+    partial class AccesoClienteContrasenaTemporal
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -202,33 +205,6 @@ namespace CRM_ALMACEN.Data.Migrations
                     b.ToTable("Clientes");
                 });
 
-            modelBuilder.Entity("CRM_ALMACEN.Models.CostoServicio", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ClienteId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Concepto")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<decimal>("ImporteNeto")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClienteId");
-
-                    b.ToTable("CostosServicio");
-                });
-
             modelBuilder.Entity("CRM_ALMACEN.Models.DetalleSolicitud", b =>
                 {
                     b.Property<int>("Id")
@@ -299,17 +275,11 @@ namespace CRM_ALMACEN.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("Anio")
-                        .HasColumnType("integer");
-
                     b.Property<int>("ClienteId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("Fecha")
                         .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("Mes")
-                        .HasColumnType("integer");
 
                     b.Property<int>("MetodoPago")
                         .HasColumnType("integer");
@@ -611,17 +581,6 @@ namespace CRM_ALMACEN.Data.Migrations
                 });
 
             modelBuilder.Entity("CRM_ALMACEN.Models.Cargo", b =>
-                {
-                    b.HasOne("CRM_ALMACEN.Models.Cliente", "Cliente")
-                        .WithMany()
-                        .HasForeignKey("ClienteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Cliente");
-                });
-
-            modelBuilder.Entity("CRM_ALMACEN.Models.CostoServicio", b =>
                 {
                     b.HasOne("CRM_ALMACEN.Models.Cliente", "Cliente")
                         .WithMany()

@@ -25,7 +25,12 @@
       "PowerShell(Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"Servidor de prueba detenido.\")",
       "Bash(git add *)",
       "Bash(git commit -q -m 'Modulo de Perfil: vista cliente solo lectura + edicion por administrador *)",
-      "Bash(git commit -q -m 'Modulo de Pagos y Facturacion *)"
+      "Bash(git commit -q -m 'Modulo de Pagos y Facturacion *)",
+      "Bash(PGPASSWORD=postgres '/c/Program Files/PostgreSQL/18/bin/psql.exe' -U postgres -h localhost -d CRM_ALMACEN -c 'SELECT \"Id\", \"ClienteId\", \"Estado\" FROM \"Solicitudes\";')",
+      "Bash(PGPASSWORD=postgres '/c/Program Files/PostgreSQL/18/bin/psql.exe' -U postgres -h localhost -d CRM_ALMACEN -c 'WITH s AS \\(INSERT INTO \"Solicitudes\" \\(\"ClienteId\",\"Fecha\",\"Estado\",\"Notas\",\"SolicitadoPor\"\\) VALUES \\(1, NOW\\(\\), 0, '\\\\''Pedido de ejemplo para el tablero'\\\\'', '\\\\''cliente@demo.com'\\\\''\\) RETURNING \"Id\"\\) INSERT INTO \"DetallesSolicitud\" \\(\"SolicitudPedidoId\",\"ProductoId\",\"Cantidad\"\\) SELECT \\(SELECT \"Id\" FROM s\\), 1, 5 UNION ALL SELECT \\(SELECT \"Id\" FROM s\\), 2, 3;')",
+      "Bash(PGPASSWORD=postgres '/c/Program Files/PostgreSQL/18/bin/psql.exe' -U postgres -h localhost -d CRM_ALMACEN -c 'SELECT \"Id\",\"Codigo\",\"CantidadDisponible\" FROM \"Productos\" WHERE \"Id\" IN \\(1,2\\);')",
+      "Bash(PGPASSWORD=postgres '/c/Program Files/PostgreSQL/18/bin/psql.exe' -U postgres -h localhost -d CRM_ALMACEN -c 'DELETE FROM \"Solicitudes\" WHERE \"Estado\" = 3;')",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

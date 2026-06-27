@@ -104,5 +104,29 @@ public static class DbSeeder
                 await db.SaveChangesAsync();
             }
         }
+
+        // 6. Pedido (solicitud) de ejemplo para el tablero
+        if (!await db.Solicitudes.AnyAsync())
+        {
+            var cliente = await db.Clientes.OrderBy(c => c.Id).FirstOrDefaultAsync();
+            var productos = await db.Productos.OrderBy(p => p.Id).Take(2).ToListAsync();
+            if (cliente is not null && productos.Count >= 2)
+            {
+                db.Solicitudes.Add(new SolicitudPedido
+                {
+                    ClienteId = cliente.Id,
+                    Fecha = DateTime.Now.AddHours(-3),
+                    Estado = EstadoSolicitud.Pendiente,
+                    Notas = "Pedido de ejemplo para el tablero.",
+                    SolicitadoPor = "cliente@demo.com",
+                    Detalles =
+                    [
+                        new DetalleSolicitud { ProductoId = productos[0].Id, Cantidad = 5 },
+                        new DetalleSolicitud { ProductoId = productos[1].Id, Cantidad = 3 }
+                    ]
+                });
+                await db.SaveChangesAsync();
+            }
+        }
     }
 }

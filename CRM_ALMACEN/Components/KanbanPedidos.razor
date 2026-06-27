@@ -1,0 +1,245 @@
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+@* Tablero de pedidos: arrastra las tarjetas entre columnas. *@
+
+@if (mensaje is not null)
+{
+    <div class="alert @(esError ? "alert-warning" : "alert-success") py-2">@mensaje</div>
+}
+
+<div class="kanban">
+    @RenderColumna("📋 Solicitado", EstadoSolicitud.Pendiente, solicitado, "col-solicitado")
+    @RenderColumna("🚚 Despachado", EstadoSolicitud.Surtida, despachado, "col-despachado")
+    @RenderColumna("✅ Entregado", EstadoSolicitud.Entregada, entregado, "col-entregado")
+</div>
+
+@* ---------- Panel de detalle ---------- *@
+@if (seleccionada is not null)
+{
+    <div class="kanban-overlay" @onclick="Cerrar">
+        <div class="kanban-detalle" @onclick:stopPropagation="true">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Pedido #@seleccionada.Id</h5>
+                <button class="btn-close" @onclick="Cerrar"></button>
+            </div>
+            <p class="text-muted small mb-2">
+                <strong>@seleccionada.Cliente?.Nombre</strong> ·
+                @seleccionada.Fecha.ToString("dd/MM/yyyy HH:mm") ·
+                <span class="badge @ColorEstado(seleccionada.Estado)">@EtiquetaEstado(seleccionada.Estado)</span>
+            </p>
+
+            <table class="table table-sm">
+                <thead><tr><th>Producto</th><th class="text-end">Cantidad</th><th class="text-end">Existencia</th></tr></thead>
+                <tbody>
+                    @foreach (var d in seleccionada.Detalles)
+                    {
+                        <tr>
+                            <td>@d.Producto?.Codigo — @d.Producto?.Nombre</td>
+                            <td class="text-end fw-bold">@d.Cantidad</td>
+                            <td class="text-end @(d.Producto is not null && d.Cantidad > d.Producto.CantidadDisponible ? "text-danger fw-bold" : "")">
+                                @d.Producto?.CantidadDisponible
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (!string.IsNullOrWhiteSpace(seleccionada.Notas))
+            {
+                <p class="small"><strong>Notas:</strong> @seleccionada.Notas</p>
+            }
+
+            <div class="d-flex gap-2 flex-wrap mt-3">
+                @if (seleccionada.Estado == EstadoSolicitud.Pendiente)
+                {
+                    <button class="btn btn-success btn-sm" @onclick="() => MoverAsync(seleccionada, EstadoSolicitud.Surtida)">🚚 Despachar</button>
+                    <button class="btn btn-outline-danger btn-sm" @onclick="() => MoverAsync(seleccionada, EstadoSolicitud.Rechazada)">Rechazar</button>
+                }
+                else if (seleccionada.Estado == EstadoSolicitud.Surtida)
+                {
+                    <button class="btn btn-primary btn-sm" @onclick="() => MoverAsync(seleccionada, EstadoSolicitud.Entregada)">✅ Marcar entregado</button>
+                }
+                else if (seleccionada.Estado == EstadoSolicitud.Entregada)
+                {
+                    <span class="text-success"><span class="bi bi-check-circle"></span> Pedido entregado.</span>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Si es true, el tablero es solo de consulta (no se arrastra ni se gestiona).</summary>
+    [Parameter] public bool SoloLectura { get; set; }
+
+    /// <summary>Si se indica, solo muestra los pedidos de ese cliente.</summary>
+    [Parameter] public int? ClienteId { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private List<SolicitudPedido> solicitado = [];
+    private List<SolicitudPedido> despachado = [];
+    private List<SolicitudPedido> entregado = [];
+
+    private SolicitudPedido? arrastrando;
+    private SolicitudPedido? seleccionada;
+    private string? usuario;
+    private string? mensaje;
+    private bool esError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        usuario = (await AuthStateTask).User.Identity?.Name;
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var query = db.Solicitudes
+            .Include(s => s.Cliente)
+            .Include(s => s.Detalles).ThenInclude(d => d.Producto)
+            .Where(s => s.Estado == EstadoSolicitud.Pendiente
+                     || s.Estado == EstadoSolicitud.Surtida
+                     || s.Estado == EstadoSolicitud.Entregada);
+
+        if (ClienteId is int cid)
+            query = query.Where(s => s.ClienteId == cid);
+
+        var lista = await query.OrderByDescending(s => s.Fecha).ToListAsync();
+
+        solicitado = lista.Where(s => s.Estado == EstadoSolicitud.Pendiente).ToList();
+        despachado = lista.Where(s => s.Estado == EstadoSolicitud.Surtida).ToList();
+        entregado = lista.Where(s => s.Estado == EstadoSolicitud.Entregada).ToList();
+    }
+
+    private async Task SoltarEnAsync(EstadoSolicitud destino)
+    {
+        if (arrastrando is null) return;
+        var s = arrastrando;
+        arrastrando = null;
+        await MoverAsync(s, destino);
+    }
+
+    private async Task MoverAsync(SolicitudPedido s, EstadoSolicitud destino)
+    {
+        mensaje = null;
+        esError = false;
+
+        if (s.Estado == destino) return;
+
+        // Reglas de transición
+        if (destino == EstadoSolicitud.Surtida && s.Estado != EstadoSolicitud.Pendiente)
+        {
+            return; // solo se despacha desde Solicitado
+        }
+        if (destino == EstadoSolicitud.Entregada && s.Estado != EstadoSolicitud.Surtida)
+        {
+            esError = true;
+            mensaje = $"El pedido #{s.Id} debe despacharse antes de marcarse como entregado.";
+            return;
+        }
+        if (destino == EstadoSolicitud.Pendiente && s.Estado != EstadoSolicitud.Pendiente)
+        {
+            esError = true;
+            mensaje = $"El pedido #{s.Id} ya fue despachado y no puede regresar a Solicitado.";
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var solicitud = await db.Solicitudes
+            .Include(x => x.Detalles).ThenInclude(d => d.Producto)
+            .FirstOrDefaultAsync(x => x.Id == s.Id);
+        if (solicitud is null) return;
+
+        if (destino == EstadoSolicitud.Surtida)
+        {
+            // Validar existencia
+            foreach (var d in solicitud.Detalles)
+            {
+                if (d.Producto is null || d.Cantidad > d.Producto.CantidadDisponible)
+                {
+                    esError = true;
+                    mensaje = $"No se puede despachar el pedido #{solicitud.Id}: existencia insuficiente de {d.Producto?.Nombre}.";
+                    return;
+                }
+            }
+            // Generar salidas y descontar
+            foreach (var d in solicitud.Detalles)
+            {
+                db.Salidas.Add(new Salida
+                {
+                    ProductoId = d.ProductoId,
+                    Cantidad = d.Cantidad,
+                    Referencia = $"Pedido #{solicitud.Id}",
+                    SolicitudPedidoId = solicitud.Id,
+                    RegistradoPor = usuario,
+                    Fecha = DateTime.Now
+                });
+                d.Producto!.CantidadDisponible -= d.Cantidad;
+            }
+            solicitud.Estado = EstadoSolicitud.Surtida;
+            solicitud.FechaAtencion = DateTime.Now;
+            solicitud.AtendidoPor = usuario;
+            mensaje = $"Pedido #{solicitud.Id} despachado.";
+        }
+        else
+        {
+            solicitud.Estado = destino;
+            if (destino == EstadoSolicitud.Entregada || destino == EstadoSolicitud.Rechazada)
+            {
+                solicitud.FechaAtencion = DateTime.Now;
+                solicitud.AtendidoPor = usuario;
+            }
+        }
+
+        await db.SaveChangesAsync();
+        seleccionada = null;
+        await CargarAsync();
+    }
+
+    private void Abrir(SolicitudPedido s) => seleccionada = s;
+    private void Cerrar() => seleccionada = null;
+
+    private RenderFragment RenderColumna(string titulo, EstadoSolicitud estado, List<SolicitudPedido> items, string css) => __builder =>
+    {
+        <div class="kanban-col @css" @ondragover:preventDefault="true" @ondrop="() => SoltarEnAsync(estado)">
+            <div class="kanban-col-header">@titulo <span class="kanban-count">@items.Count</span></div>
+            @foreach (var s in items)
+            {
+                <div class="kanban-card" draggable="true"
+                     @ondragstart="() => arrastrando = s"
+                     @onclick="() => Abrir(s)">
+                    <div class="kanban-card-id">Pedido #@s.Id</div>
+                    <div class="kanban-card-cliente">@s.Cliente?.Nombre</div>
+                    <div class="kanban-card-meta">
+                        <span><span class="bi bi-box"></span> @s.Detalles.Count art.</span>
+                        <span>@s.Fecha.ToString("dd/MM/yy")</span>
+                    </div>
+                </div>
+            }
+            @if (items.Count == 0)
+            {
+                <div class="kanban-vacio">Arrastra pedidos aquí</div>
+            }
+        </div>
+    };
+
+    private static string ColorEstado(EstadoSolicitud e) => e switch
+    {
+        EstadoSolicitud.Pendiente => "text-bg-warning",
+        EstadoSolicitud.Surtida => "text-bg-info",
+        EstadoSolicitud.Entregada => "text-bg-success",
+        EstadoSolicitud.Rechazada => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
+
+    private static string EtiquetaEstado(EstadoSolicitud e) => e switch
+    {
+        EstadoSolicitud.Pendiente => "Solicitado",
+        EstadoSolicitud.Surtida => "Despachado",
+        EstadoSolicitud.Entregada => "Entregado",
+        EstadoSolicitud.Rechazada => "Rechazado",
+        _ => e.ToString()
+    };
+}

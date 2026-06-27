@@ -122,6 +122,92 @@ main {
     font-size: .9rem;
 }
 
+/* ---------- Menú de usuario (esquina superior derecha) ---------- */
+.user-menu {
+    position: relative;
+}
+
+.user-menu > summary {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .35rem .65rem;
+    border-radius: 10px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    transition: background .15s;
+}
+
+.user-menu > summary::-webkit-details-marker { display: none; }
+.user-menu > summary:hover { background: #f1f4f9; }
+
+.user-menu-avatar {
+    font-size: 1.6rem;
+    color: var(--azul-marca);
+    line-height: 1;
+}
+
+.user-menu-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    text-align: left;
+}
+
+.user-menu-nombre {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: .92rem;
+}
+
+.user-menu-correo {
+    font-size: .78rem;
+    color: #6b7280;
+}
+
+.user-menu-caret {
+    font-size: .8rem;
+    color: #9aa3af;
+    transition: transform .15s;
+}
+
+.user-menu[open] .user-menu-caret { transform: rotate(180deg); }
+
+.user-menu-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + .4rem);
+    min-width: 230px;
+    background: #fff;
+    border: 1px solid #e3e6ea;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    padding: .4rem;
+    z-index: 1050;
+}
+
+.user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    width: 100%;
+    padding: .6rem .75rem;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    font-size: .9rem;
+    color: #1f2937;
+    text-decoration: none;
+    cursor: pointer;
+    text-align: left;
+}
+
+.user-menu-item:hover { background: #f1f4f9; }
+
+.user-menu-salir { color: #c0392b; }
+.user-menu-salir:hover { background: #fdecea; }
+
 /* ---------- Tarjetas ---------- */
 .card {
     border: none;
@@ -153,6 +239,105 @@ main {
 .form-control:focus, .form-select:focus {
     border-color: var(--azul-acento);
     box-shadow: 0 0 0 .2rem rgba(45,108,223,.15);
+}
+
+/* ---------- Tablero Kanban ---------- */
+.kanban {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.kanban-col {
+    background: #eef1f5;
+    border-radius: .85rem;
+    padding: .75rem;
+    min-height: 220px;
+    border: 2px dashed transparent;
+    transition: border-color .15s, background .15s;
+}
+
+.kanban-col.col-solicitado { border-top: 4px solid #f0ad4e; }
+.kanban-col.col-despachado { border-top: 4px solid #2d6cdf; }
+.kanban-col.col-entregado  { border-top: 4px solid #2e9e5b; }
+
+.kanban-col-header {
+    font-weight: 600;
+    color: #374151;
+    padding: .25rem .5rem .6rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+.kanban-count {
+    background: #d4dbe6;
+    color: #374151;
+    border-radius: 1rem;
+    padding: 0 .55rem;
+    font-size: .8rem;
+    margin-left: auto;
+}
+
+.kanban-card {
+    background: #fff;
+    border-radius: .6rem;
+    padding: .7rem .8rem;
+    margin-bottom: .6rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    cursor: grab;
+    border-left: 4px solid #c8d0dd;
+    transition: box-shadow .15s, transform .05s;
+}
+
+.kanban-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.14); }
+.kanban-card:active { cursor: grabbing; transform: scale(.98); }
+
+.kanban-card-id { font-weight: 700; color: #1f2937; font-size: .95rem; }
+.kanban-card-cliente { color: #4b5563; font-size: .9rem; margin: .15rem 0; }
+.kanban-card-meta {
+    display: flex;
+    justify-content: space-between;
+    color: #8a93a3;
+    font-size: .78rem;
+    margin-top: .35rem;
+}
+
+.kanban-vacio {
+    text-align: center;
+    color: #9aa3b2;
+    font-size: .82rem;
+    padding: 1.5rem .5rem;
+    border: 2px dashed #d4dbe6;
+    border-radius: .6rem;
+}
+
+/* Panel de detalle (modal sencillo) */
+.kanban-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20,28,46,.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1060;
+    padding: 1rem;
+}
+
+.kanban-detalle {
+    background: #fff;
+    border-radius: .85rem;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 560px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.3);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .kanban { grid-template-columns: 1fr; }
 }
 
 /* ---------- Total del periodo (Pagos) ---------- */

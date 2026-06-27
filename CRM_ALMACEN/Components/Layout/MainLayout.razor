@@ -1,4 +1,5 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
 <div class="page">
     <div class="sidebar">
@@ -9,14 +10,27 @@
         <div class="top-row px-4">
             <AuthorizeView>
                 <Authorized>
-                    <span class="me-3 text-muted small">
-                        <span class="bi bi-person-circle"></span>
-                        @context.User.Identity?.Name
-                    </span>
-                    <form action="Account/Logout" method="post" class="d-inline">
-                        <AntiforgeryToken />
-                        <button type="submit" class="btn btn-sm btn-outline-secondary">Cerrar sesión</button>
-                    </form>
+                    <details class="user-menu">
+                        <summary>
+                            <span class="bi bi-person-circle user-menu-avatar"></span>
+                            <span class="user-menu-info">
+                                <span class="user-menu-nombre">@context.User.NombreParaMostrar()</span>
+                                <span class="user-menu-correo">@context.User.Identity?.Name</span>
+                            </span>
+                            <span class="bi bi-chevron-down user-menu-caret"></span>
+                        </summary>
+                        <div class="user-menu-panel">
+                            <a href="Account/CambiarPassword" class="user-menu-item">
+                                <span class="bi bi-key"></span> Cambiar contraseña
+                            </a>
+                            <form action="Account/Logout" method="post">
+                                <AntiforgeryToken />
+                                <button type="submit" class="user-menu-item user-menu-salir">
+                                    <span class="bi bi-box-arrow-right"></span> Cerrar sesión
+                                </button>
+                            </form>
+                        </div>
+                    </details>
                 </Authorized>
                 <NotAuthorized>
                     <a href="Account/Login" class="btn btn-sm btn-primary">Iniciar sesión</a>
@@ -35,3 +49,19 @@
     <a href="." class="reload">Recargar</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is null) return;
+
+        var user = (await AuthState).User;
+        // Si el usuario tiene una contraseña temporal, no lo dejamos usar la app
+        // hasta que la cambie (la pantalla de cambio usa otro layout).
+        if (user.Identity?.IsAuthenticated == true && user.RequiereCambioPassword())
+            Navigation.NavigateTo("/Account/CambiarPassword", forceLoad: true);
+    }
+}

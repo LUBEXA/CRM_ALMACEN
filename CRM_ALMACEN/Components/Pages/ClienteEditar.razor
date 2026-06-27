@@ -5,6 +5,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject AlmacenamientoArchivos Almacenamiento
 @inject NavigationManager Navigation
+@inject UserManager<ApplicationUser> UserManager
 
 <PageTitle>Editar cliente - CRM Almacén</PageTitle>
 
@@ -23,6 +24,20 @@ else if (cliente is null)
 }
 else
 {
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(pestania == "general" ? "active" : "")" @onclick='() => pestania = "general"'>
+                <span class="bi bi-person-lines-fill"></span> Información general
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(pestania == "costos" ? "active" : "")" @onclick='() => pestania = "costos"'>
+                <span class="bi bi-cash-coin"></span> Costos del servicio
+            </button>
+        </li>
+    </ul>
+
+    <div class="@(pestania == "general" ? "" : "d-none")">
     <div class="card shadow-sm">
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start mb-4">
@@ -113,6 +128,157 @@ else
             </EditForm>
         </div>
     </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-body p-4">
+            <h5 class="text-primary mb-3">Acceso al sistema</h5>
+            <p class="text-muted small">
+                Personas que pueden iniciar sesión en nombre de este cliente. Puedes
+                agregar un segundo correo o restablecer la contraseña cuando lo necesiten.
+            </p>
+
+            @if (credenciales.Count > 0)
+            {
+                <div class="alert alert-success">
+                    <strong>Contraseña temporal generada.</strong>
+                    Compártela con la persona; el sistema le pedirá cambiarla en su próximo ingreso.
+                    @foreach (var c in credenciales)
+                    {
+                        <ul class="mb-2 mt-2">
+                            <li>Usuario (correo): <code>@c.Correo</code></li>
+                            <li>Contraseña temporal: <code>@c.Password</code></li>
+                        </ul>
+                    }
+                </div>
+            }
+            @if (errorAcceso is not null)
+            {
+                <div class="alert alert-danger">@errorAcceso</div>
+            }
+
+            @if (usuarios.Count == 0)
+            {
+                <p class="text-muted"><em>Este cliente todavía no tiene accesos.</em></p>
+            }
+            else
+            {
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Correo</th><th>Nombre</th><th>Estado</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var u in usuarios)
+                        {
+                            <tr>
+                                <td>@u.Email</td>
+                                <td>@u.NombreCompleto</td>
+                                <td>
+                                    @if (u.RequiereCambioPassword)
+                                    {
+                                        <span class="badge text-bg-warning">Contraseña temporal pendiente</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-success">Activo</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => RestablecerAsync(u.Id)" disabled="@procesando">
+                                        <span class="bi bi-key"></span> Restablecer contraseña
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAccesoAsync(u.Id)" disabled="@procesando">
+                                        <span class="bi bi-trash"></span> Quitar
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <hr class="my-3" />
+            <h6 class="mb-3">Agregar acceso</h6>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label">Correo de acceso (usuario)</label>
+                    <input class="form-control" @bind="nuevoCorreo" placeholder="correo@ejemplo.com" />
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Nombre para mostrar</label>
+                    <input class="form-control" @bind="nuevoNombre" placeholder="Nombre de la persona" />
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" @onclick="AgregarAccesoAsync" disabled="@procesando">
+                        Crear acceso
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <div class="@(pestania == "costos" ? "" : "d-none")">
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary mb-0">Costos del servicio</h5>
+                <button class="btn btn-sm btn-primary" @onclick="AgregarCosto">
+                    <span class="bi bi-plus-lg"></span> Agregar
+                </button>
+            </div>
+            <p class="text-muted small">
+                Define los conceptos e importes que incluye el servicio. El cliente los verá
+                de forma informativa en su perfil.
+            </p>
+
+            @if (costos.Count == 0)
+            {
+                <p class="text-muted"><em>Todavía no hay costos. Usa el botón «Agregar» para crear el primero.</em></p>
+            }
+            else
+            {
+                <table class="table align-middle">
+                    <thead><tr><th style="width:60%">Concepto</th><th style="width:30%">Importe neto (MXN)</th><th></th></tr></thead>
+                    <tbody>
+                        @for (int i = 0; i < costos.Count; i++)
+                        {
+                            var idx = i;
+                            <tr>
+                                <td>
+                                    <input class="form-control" @bind="costos[idx].Concepto" placeholder="Ej. Renta de tarima mediana" />
+                                </td>
+                                <td>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" step="0.01" min="0" class="form-control" @bind="costos[idx].ImporteNeto" />
+                                    </div>
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => QuitarCosto(idx)">
+                                        <span class="bi bi-trash"></span>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (errorCostos is not null)
+            {
+                <div class="alert alert-danger">@errorCostos</div>
+            }
+            @if (mensajeCostos is not null)
+            {
+                <div class="alert alert-success">@mensajeCostos</div>
+            }
+
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-primary px-4" @onclick="GuardarCostosAsync" disabled="@guardandoCostos">
+                    @(guardandoCostos ? "Guardando..." : "Guardar costos")
+                </button>
+            </div>
+        </div>
+    </div>
+    </div>
 }
 
 @code {
@@ -123,11 +289,213 @@ else
     private string? mensaje;
     private bool subiendoLogo, subiendoConstancia;
 
+    // Pestaña activa: "general" | "costos".
+    private string pestania = "general";
+
+    // Costos del servicio (tarifario).
+    private List<CostoServicio> costos = new();
+    private bool guardandoCostos;
+    private string? mensajeCostos;
+    private string? errorCostos;
+
+    // Accesos (usuarios) del cliente.
+    private List<ApplicationUser> usuarios = new();
+    private string? nuevoCorreo;
+    private string? nuevoNombre;
+    private string? errorAcceso;
+    private bool procesando;
+    private readonly List<(string Correo, string Password)> credenciales = new();
+
     protected override async Task OnInitializedAsync()
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         cliente = await db.Clientes.FindAsync(Id);
+        await CargarUsuariosAsync();
+        await CargarCostosAsync();
         cargando = false;
+    }
+
+    private async Task CargarCostosAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        costos = await db.CostosServicio
+            .Where(c => c.ClienteId == Id)
+            .OrderBy(c => c.Id)
+            .ToListAsync();
+    }
+
+    private void AgregarCosto()
+    {
+        mensajeCostos = null;
+        errorCostos = null;
+        costos.Add(new CostoServicio { ClienteId = Id });
+    }
+
+    private void QuitarCosto(int indice)
+    {
+        mensajeCostos = null;
+        errorCostos = null;
+        if (indice >= 0 && indice < costos.Count)
+            costos.RemoveAt(indice);
+    }
+
+    private async Task GuardarCostosAsync()
+    {
+        mensajeCostos = null;
+        errorCostos = null;
+
+        // Validar: todos los conceptos con texto.
+        if (costos.Any(c => string.IsNullOrWhiteSpace(c.Concepto)))
+        {
+            errorCostos = "Cada costo necesita un concepto. Llena o elimina las filas vacías.";
+            return;
+        }
+
+        guardandoCostos = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            // Eliminar de la BD los que el admin quitó de la lista.
+            var existentes = await db.CostosServicio.Where(c => c.ClienteId == Id).ToListAsync();
+            foreach (var e in existentes)
+            {
+                if (!costos.Any(c => c.Id == e.Id))
+                    db.CostosServicio.Remove(e);
+            }
+
+            // Agregar nuevos y actualizar los existentes.
+            foreach (var c in costos)
+            {
+                c.Concepto = c.Concepto.Trim();
+                c.ClienteId = Id;
+                if (c.Id == 0)
+                    db.CostosServicio.Add(c);
+                else
+                    db.CostosServicio.Update(c);
+            }
+
+            await db.SaveChangesAsync();
+            await CargarCostosAsync();
+            mensajeCostos = "Costos guardados correctamente.";
+        }
+        finally { guardandoCostos = false; }
+    }
+
+    private async Task CargarUsuariosAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        usuarios = await db.Users
+            .Where(u => u.ClienteId == Id)
+            .OrderBy(u => u.Email)
+            .ToListAsync();
+    }
+
+    private async Task AgregarAccesoAsync()
+    {
+        errorAcceso = null;
+        credenciales.Clear();
+
+        var correo = nuevoCorreo?.Trim();
+        if (string.IsNullOrWhiteSpace(correo))
+        {
+            errorAcceso = "Escribe un correo electrónico para el acceso.";
+            return;
+        }
+        if (await UserManager.FindByEmailAsync(correo) is not null)
+        {
+            errorAcceso = $"Ya existe un usuario con el correo '{correo}'. Usa otro correo.";
+            return;
+        }
+
+        procesando = true;
+        try
+        {
+            var passwordTemporal = GenerarPasswordTemporal();
+            var usuario = new ApplicationUser
+            {
+                UserName = correo,
+                Email = correo,
+                EmailConfirmed = true,
+                NombreCompleto = string.IsNullOrWhiteSpace(nuevoNombre) ? cliente?.Nombre : nuevoNombre,
+                ClienteId = Id,
+                RequiereCambioPassword = true
+            };
+
+            var creado = await UserManager.CreateAsync(usuario, passwordTemporal);
+            if (!creado.Succeeded)
+            {
+                errorAcceso = "No se pudo crear el acceso: "
+                    + string.Join(" ", creado.Errors.Select(e => e.Description));
+                return;
+            }
+
+            await UserManager.AddToRoleAsync(usuario, DbSeeder.RolCliente);
+            credenciales.Add((correo, passwordTemporal));
+            nuevoCorreo = null;
+            nuevoNombre = null;
+            await CargarUsuariosAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task RestablecerAsync(string userId)
+    {
+        errorAcceso = null;
+        credenciales.Clear();
+
+        procesando = true;
+        try
+        {
+            var usuario = await UserManager.FindByIdAsync(userId);
+            if (usuario is null) return;
+
+            var passwordTemporal = GenerarPasswordTemporal();
+            var token = await UserManager.GeneratePasswordResetTokenAsync(usuario);
+            var resultado = await UserManager.ResetPasswordAsync(usuario, token, passwordTemporal);
+            if (!resultado.Succeeded)
+            {
+                errorAcceso = "No se pudo restablecer la contraseña: "
+                    + string.Join(" ", resultado.Errors.Select(e => e.Description));
+                return;
+            }
+
+            usuario.RequiereCambioPassword = true;
+            await UserManager.UpdateAsync(usuario);
+
+            credenciales.Add((usuario.Email!, passwordTemporal));
+            await CargarUsuariosAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task EliminarAccesoAsync(string userId)
+    {
+        errorAcceso = null;
+        credenciales.Clear();
+
+        procesando = true;
+        try
+        {
+            var usuario = await UserManager.FindByIdAsync(userId);
+            if (usuario is null) return;
+
+            var resultado = await UserManager.DeleteAsync(usuario);
+            if (!resultado.Succeeded)
+            {
+                errorAcceso = "No se pudo quitar el acceso: "
+                    + string.Join(" ", resultado.Errors.Select(e => e.Description));
+                return;
+            }
+            await CargarUsuariosAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private static string GenerarPasswordTemporal()
+    {
+        var numero = Random.Shared.Next(1000, 9999);
+        return $"Lbx{numero}$";
     }
 
     private async Task SubirLogo(InputFileChangeEventArgs e)

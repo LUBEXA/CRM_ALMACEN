@@ -18,4 +18,10 @@ public class ApplicationUser : IdentityUser
     /// </summary>
     public int? ClienteId { get; set; }
     public Cliente? Cliente { get; set; }
+
+    /// <summary>
+    /// True cuando el usuario tiene una contraseña temporal y debe cambiarla
+    /// la primera vez que inicie sesión.
+    /// </summary>
+    public bool RequiereCambioPassword { get; set; }
 }

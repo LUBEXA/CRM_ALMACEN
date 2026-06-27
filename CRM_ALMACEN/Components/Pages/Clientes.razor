@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject UserManager<ApplicationUser> UserManager
 
 <PageTitle>Clientes - CRM Almacén</PageTitle>
 
@@ -14,34 +15,127 @@
     <div class="card-body">
         <EditForm Model="nuevo" OnValidSubmit="GuardarAsync" FormName="formCliente">
             <DataAnnotationsValidator />
+
+            <h6 class="text-primary mb-3">Información general</h6>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Nombre / Razón social</label>
                     <InputText class="form-control" @bind-Value="nuevo.Nombre" />
                     <ValidationMessage For="() => nuevo.Nombre" class="text-danger" />
                 </div>
+                <div class="col-md-6">
+                    <label class="form-label">Nombre del representante</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Representante" />
+                </div>
                 <div class="col-md-3">
                     <label class="form-label">RFC</label>
                     <InputText class="form-control" @bind-Value="nuevo.Rfc" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Correo electrónico</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Correo" />
+                    <ValidationMessage For="() => nuevo.Correo" class="text-danger" />
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Teléfono</label>
                     <InputText class="form-control" @bind-Value="nuevo.Telefono" />
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Correo</label>
-                    <InputText class="form-control" @bind-Value="nuevo.Correo" />
+                    <label class="form-label">2do correo electrónico</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Correo2" />
+                    <ValidationMessage For="() => nuevo.Correo2" class="text-danger" />
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-3">
+                    <label class="form-label">2do teléfono</label>
+                    <InputText class="form-control" @bind-Value="nuevo.Telefono2" />
+                </div>
+                <div class="col-md-9">
                     <label class="form-label">Dirección</label>
                     <InputText class="form-control" @bind-Value="nuevo.Direccion" />
                 </div>
+                <div class="col-12">
+                    <div class="form-check form-switch bg-light p-3 rounded d-flex align-items-center">
+                        <InputCheckbox class="form-check-input me-2" @bind-Value="nuevo.RequiereFactura" id="factura" style="margin-left:0" />
+                        <label class="form-check-label" for="factura">Requiere factura CFDI de todos sus pagos</label>
+                    </div>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary mt-3">Guardar cliente</button>
+
+            <hr class="my-4" />
+
+            <h6 class="text-primary mb-3">Acceso al sistema</h6>
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="form-check form-switch d-flex align-items-center">
+                        <InputCheckbox class="form-check-input me-2" @bind-Value="crearAcceso" id="acceso" style="margin-left:0" />
+                        <label class="form-check-label" for="acceso">
+                            Crear usuario para que el cliente inicie sesión (se genera una contraseña temporal)
+                        </label>
+                    </div>
+                </div>
+                @if (crearAcceso)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label">Correo de acceso (usuario)</label>
+                        <InputText class="form-control" @bind-Value="usuarioCorreo" placeholder="correo@ejemplo.com" />
+                        <small class="text-muted">Con este correo iniciará sesión el cliente.</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nombre para mostrar</label>
+                        <InputText class="form-control" @bind-Value="usuarioNombre" placeholder="Nombre del contacto o empresa" />
+                    </div>
+                }
+
+                <div class="col-12">
+                    <div class="form-check form-switch d-flex align-items-center">
+                        <InputCheckbox class="form-check-input me-2" @bind-Value="crearAcceso2" id="acceso2" style="margin-left:0" />
+                        <label class="form-check-label" for="acceso2">
+                            Crear también acceso para una segunda persona (2do correo)
+                        </label>
+                    </div>
+                </div>
+                @if (crearAcceso2)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label">2do correo de acceso (usuario)</label>
+                        <InputText class="form-control" @bind-Value="usuarioCorreo2" placeholder="correo2@ejemplo.com" />
+                        <small class="text-muted">Esta segunda persona iniciará sesión con este correo.</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nombre para mostrar</label>
+                        <InputText class="form-control" @bind-Value="usuarioNombre2" placeholder="Nombre de la segunda persona" />
+                    </div>
+                }
+            </div>
+
+            <button type="submit" class="btn btn-primary mt-3" disabled="@guardando">
+                @(guardando ? "Guardando..." : "Guardar cliente")
+            </button>
         </EditForm>
-        @if (mensaje is not null)
+
+        @if (credenciales.Count > 0)
+        {
+            <div class="alert alert-success mt-3 mb-0">
+                <strong>✅ Cliente creado con acceso.</strong>
+                <p class="mb-1 mt-2">Comparte estos datos con el cliente. La contraseña es <strong>temporal</strong>:
+                    el sistema le pedirá cambiarla en su primer ingreso.</p>
+                @foreach (var c in credenciales)
+                {
+                    <ul class="mb-2">
+                        <li>Usuario (correo): <code>@c.Correo</code></li>
+                        <li>Contraseña temporal: <code>@c.Password</code></li>
+                    </ul>
+                }
+            </div>
+        }
+        else if (mensaje is not null)
         {
             <div class="alert alert-success mt-3 mb-0">@mensaje</div>
+        }
+
+        @if (error is not null)
+        {
+            <div class="alert alert-danger mt-3 mb-0">@error</div>
         }
     </div>
 </div>
@@ -67,6 +161,9 @@ else
                         <a href="clientes/editar/@c.Id" class="btn btn-sm btn-outline-primary">
                             <span class="bi bi-pencil"></span> Editar
                         </a>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => PedirEliminar(c)">
+                            <span class="bi bi-trash"></span> Eliminar
+                        </button>
                     </td>
                 </tr>
             }
@@ -78,10 +175,54 @@ else
     </table>
 }
 
+@if (clienteAEliminar is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Eliminar cliente</h5>
+                </div>
+                <div class="modal-body">
+                    <p>¿Seguro que deseas eliminar a <strong>@clienteAEliminar.Nombre</strong>?</p>
+                    <p class="text-muted small mb-0">
+                        También se eliminarán los usuarios de acceso ligados a este cliente.
+                        Esta acción no se puede deshacer.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" @onclick="CancelarEliminar" disabled="@eliminando">Cancelar</button>
+                    <button class="btn btn-danger" @onclick="ConfirmarEliminarAsync" disabled="@eliminando">
+                        @(eliminando ? "Eliminando..." : "Sí, eliminar")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<Cliente>? clientes;
     private Cliente nuevo = new();
     private string? mensaje;
+    private string? error;
+    private bool guardando;
+
+    // Datos para crear el acceso (usuario) del cliente.
+    private bool crearAcceso = true;
+    private string? usuarioCorreo;
+    private string? usuarioNombre;
+
+    // Datos para crear un segundo acceso (otra persona del mismo cliente).
+    private bool crearAcceso2;
+    private string? usuarioCorreo2;
+    private string? usuarioNombre2;
+
+    private readonly List<(string Correo, string Password)> credenciales = new();
+
+    // Confirmación de borrado.
+    private Cliente? clienteAEliminar;
+    private bool eliminando;
 
     protected override async Task OnInitializedAsync() => await CargarAsync();
 
@@ -91,13 +232,176 @@ else
         clientes = await db.Clientes.Include(c => c.Productos).OrderBy(c => c.Nombre).ToListAsync();
     }
 
+    private void PedirEliminar(Cliente c)
+    {
+        error = null;
+        mensaje = null;
+        clienteAEliminar = c;
+    }
+
+    private void CancelarEliminar() => clienteAEliminar = null;
+
+    private async Task ConfirmarEliminarAsync()
+    {
+        if (clienteAEliminar is null) return;
+
+        eliminando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var id = clienteAEliminar.Id;
+            var nombre = clienteAEliminar.Nombre;
+
+            // No permitir eliminar si tiene historial: protege información importante.
+            var tieneHistorial =
+                await db.Productos.AnyAsync(p => p.ClienteId == id) ||
+                await db.Solicitudes.AnyAsync(s => s.ClienteId == id) ||
+                await db.Pagos.AnyAsync(p => p.ClienteId == id) ||
+                await db.Cargos.AnyAsync(c => c.ClienteId == id);
+
+            if (tieneHistorial)
+            {
+                error = $"No se puede eliminar '{nombre}' porque tiene productos, pedidos, " +
+                        "cargos o pagos registrados. Para conservar el historial, mejor edítalo " +
+                        "y déjalo inactivo en lugar de eliminarlo.";
+                clienteAEliminar = null;
+                return;
+            }
+
+            // Eliminar primero los usuarios de acceso ligados (la relación es Restrict).
+            var usuarios = await db.Users.Where(u => u.ClienteId == id).ToListAsync();
+            db.Users.RemoveRange(usuarios);
+
+            var cliente = await db.Clientes.FindAsync(id);
+            if (cliente is not null)
+                db.Clientes.Remove(cliente);
+
+            await db.SaveChangesAsync();
+
+            mensaje = $"Cliente '{nombre}' eliminado correctamente.";
+            clienteAEliminar = null;
+            await CargarAsync();
+        }
+        finally
+        {
+            eliminando = false;
+        }
+    }
+
     private async Task GuardarAsync()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        db.Clientes.Add(nuevo);
-        await db.SaveChangesAsync();
-        mensaje = $"Cliente '{nuevo.Nombre}' guardado.";
-        nuevo = new();
-        await CargarAsync();
+        mensaje = null;
+        error = null;
+        credenciales.Clear();
+
+        // Tomar el correo de acceso del campo dedicado o, si está vacío, del correo del cliente.
+        var correoAcceso = (usuarioCorreo ?? nuevo.Correo)?.Trim();
+        var correoAcceso2 = (usuarioCorreo2 ?? nuevo.Correo2)?.Trim();
+
+        // Validar los accesos solicitados antes de guardar nada.
+        if (crearAcceso)
+        {
+            if (string.IsNullOrWhiteSpace(correoAcceso))
+            {
+                error = "Para crear el acceso necesitas un correo electrónico.";
+                return;
+            }
+            if (await UserManager.FindByEmailAsync(correoAcceso) is not null)
+            {
+                error = $"Ya existe un usuario con el correo '{correoAcceso}'. Usa otro correo.";
+                return;
+            }
+        }
+
+        if (crearAcceso2)
+        {
+            if (string.IsNullOrWhiteSpace(correoAcceso2))
+            {
+                error = "Para crear el segundo acceso necesitas un 2do correo electrónico.";
+                return;
+            }
+            if (string.Equals(correoAcceso, correoAcceso2, StringComparison.OrdinalIgnoreCase))
+            {
+                error = "El segundo correo de acceso debe ser distinto al primero.";
+                return;
+            }
+            if (await UserManager.FindByEmailAsync(correoAcceso2) is not null)
+            {
+                error = $"Ya existe un usuario con el correo '{correoAcceso2}'. Usa otro correo.";
+                return;
+            }
+        }
+
+        guardando = true;
+        try
+        {
+            // 1. Guardar el cliente para obtener su Id.
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Clientes.Add(nuevo);
+            await db.SaveChangesAsync();
+
+            // 2. Crear los usuarios de acceso con contraseña temporal (los que se pidieron).
+            if (crearAcceso)
+                await CrearAccesoAsync(correoAcceso!, usuarioNombre);
+
+            if (crearAcceso2)
+                await CrearAccesoAsync(correoAcceso2!, usuarioNombre2);
+
+            if (credenciales.Count == 0 && error is null)
+                mensaje = $"Cliente '{nuevo.Nombre}' guardado.";
+
+            // 3. Limpiar el formulario y recargar la lista.
+            nuevo = new();
+            usuarioCorreo = null;
+            usuarioNombre = null;
+            usuarioCorreo2 = null;
+            usuarioNombre2 = null;
+            crearAcceso2 = false;
+            await CargarAsync();
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    /// <summary>
+    /// Crea un usuario de acceso para el cliente recién guardado, con una
+    /// contraseña temporal que deberá cambiar en su primer ingreso.
+    /// </summary>
+    private async Task CrearAccesoAsync(string correo, string? nombre)
+    {
+        var passwordTemporal = GenerarPasswordTemporal();
+        var usuario = new ApplicationUser
+        {
+            UserName = correo,
+            Email = correo,
+            EmailConfirmed = true,
+            NombreCompleto = string.IsNullOrWhiteSpace(nombre) ? nuevo.Nombre : nombre,
+            ClienteId = nuevo.Id,
+            RequiereCambioPassword = true
+        };
+
+        var creado = await UserManager.CreateAsync(usuario, passwordTemporal);
+        if (!creado.Succeeded)
+        {
+            error = (error is null ? "" : error + " ")
+                + $"No se pudo crear el acceso para '{correo}': "
+                + string.Join(" ", creado.Errors.Select(e => e.Description));
+            return;
+        }
+
+        await UserManager.AddToRoleAsync(usuario, DbSeeder.RolCliente);
+        credenciales.Add((correo, passwordTemporal));
+    }
+
+    /// <summary>
+    /// Genera una contraseña temporal sencilla pero válida según la política
+    /// (mínimo 6 caracteres, con letras, números y un símbolo).
+    /// </summary>
+    private static string GenerarPasswordTemporal()
+    {
+        var numero = Random.Shared.Next(1000, 9999);
+        return $"Lbx{numero}$";
     }
 }

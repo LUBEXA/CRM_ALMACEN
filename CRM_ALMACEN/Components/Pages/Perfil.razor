@@ -21,6 +21,20 @@ else if (cliente is null)
 }
 else
 {
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(pestania == "general" ? "active" : "")" @onclick='() => pestania = "general"'>
+                <span class="bi bi-person-lines-fill"></span> Información general
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(pestania == "costos" ? "active" : "")" @onclick='() => pestania = "costos"'>
+                <span class="bi bi-cash-coin"></span> Costos del servicio
+            </button>
+        </li>
+    </ul>
+
+    <div class="@(pestania == "general" ? "" : "d-none")">
     <div class="card shadow-sm">
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start mb-4">
@@ -77,6 +91,40 @@ else
             </div>
         </div>
     </div>
+    </div>
+
+    <div class="@(pestania == "costos" ? "" : "d-none")">
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h5 class="text-primary mb-3">Costos del servicio</h5>
+            <p class="text-muted small">
+                <span class="bi bi-info-circle"></span>
+                Estos son los conceptos e importes que incluye tu servicio. Si tienes dudas,
+                comunícate con tu administrador.
+            </p>
+
+            @if (costos.Count == 0)
+            {
+                <p class="text-muted"><em>Aún no hay costos registrados.</em></p>
+            }
+            else
+            {
+                <table class="table table-striped align-middle">
+                    <thead><tr><th>Concepto</th><th class="text-end">Importe neto</th></tr></thead>
+                    <tbody>
+                        @foreach (var c in costos)
+                        {
+                            <tr>
+                                <td>@c.Concepto</td>
+                                <td class="text-end">@Money(c.ImporteNeto)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+    </div>
 }
 
 @code {
@@ -85,6 +133,8 @@ else
 
     private Cliente? cliente;
     private bool cargando = true;
+    private string pestania = "general";
+    private List<CostoServicio> costos = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -95,7 +145,13 @@ else
         {
             await using var db = await DbFactory.CreateDbContextAsync();
             cliente = await db.Clientes.FindAsync(id);
+            costos = await db.CostosServicio
+                .Where(c => c.ClienteId == id)
+                .OrderBy(c => c.Id)
+                .ToListAsync();
         }
         cargando = false;
     }
+
+    private static string Money(decimal m) => $"${m:N2} MXN";
 }

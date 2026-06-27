@@ -25,6 +25,12 @@ public class Pago
 
     public DateTime Fecha { get; set; } = DateTime.Now;
 
+    /// <summary>Periodo (mes/año) al que se aplica el pago, para calcular el estado de cuenta.</summary>
+    public int Anio { get; set; } = DateTime.Now.Year;
+
+    [Range(1, 12)]
+    public int Mes { get; set; } = DateTime.Now.Month;
+
     [Range(0.01, double.MaxValue, ErrorMessage = "El monto debe ser mayor a cero.")]
     public decimal Monto { get; set; }
 
@@ -43,6 +49,9 @@ public class Pago
 
     [MaxLength(150)]
     public string? RegistradoPor { get; set; }
+
+    /// <summary>Nombre del mes/año del periodo en español para mostrar.</summary>
+    public string PeriodoTexto => $"{NombresMes.Get(Mes)} {Anio}";
 
     /// <summary>Texto del método de pago para mostrar.</summary>
     public string MetodoTexto => MetodoPago switch
