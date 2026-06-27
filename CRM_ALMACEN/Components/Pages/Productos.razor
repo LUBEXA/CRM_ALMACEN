@@ -66,10 +66,23 @@
 }
 else
 {
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Filtrar por cliente</label>
+            <select class="form-select" @bind="filtroClienteId">
+                <option value="0">-- Todos los clientes --</option>
+                @foreach (var c in clientes)
+                {
+                    <option value="@c.Id">@c.Nombre</option>
+                }
+            </select>
+        </div>
+    </div>
+
     <table class="table table-striped align-middle">
         <thead><tr><th>Código</th><th>Nombre</th><th>Cliente</th><th>Unidad</th><th class="text-end">Disponible</th></tr></thead>
         <tbody>
-            @foreach (var p in productos)
+            @foreach (var p in productosFiltrados)
             {
                 <tr>
                     <td><code>@p.Codigo</code></td>
@@ -79,7 +92,7 @@ else
                     <td class="text-end fw-bold">@p.CantidadDisponible</td>
                 </tr>
             }
-            @if (productos.Count == 0)
+            @if (!productosFiltrados.Any())
             {
                 <tr><td colspan="5" class="text-center text-muted py-4">Sin productos.</td></tr>
             }
@@ -93,6 +106,12 @@ else
     private Producto nuevo = new();
     private string? mensaje;
     private bool error;
+    private int filtroClienteId;
+
+    private IEnumerable<Producto> productosFiltrados =>
+        filtroClienteId == 0
+            ? (productos ?? [])
+            : (productos ?? []).Where(p => p.ClienteId == filtroClienteId);
 
     protected override async Task OnInitializedAsync() => await CargarAsync();
 

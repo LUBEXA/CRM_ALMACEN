@@ -13,57 +13,107 @@
         : "Pide al almacén que te surta mercancía.")
 </p>
 
-@* ---- Formulario de creación (solo Cliente) ---- *@
+@* ---- Creación de pedido (solo Cliente): tabla de artículos + panel del pedido ---- *@
 @if (!esAdmin && clienteId is not null)
 {
-    <div class="card mb-4">
-        <div class="card-header">Nueva solicitud</div>
-        <div class="card-body">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-6">
-                    <label class="form-label">Producto</label>
-                    <select class="form-select" @bind="productoSeleccionado">
-                        <option value="0">-- Selecciona --</option>
-                        @foreach (var p in misProductos)
-                        {
-                            <option value="@p.Id">@p.Codigo — @p.Nombre (disp: @p.CantidadDisponible)</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Cantidad</label>
-                    <input type="number" min="1" class="form-control" @bind="cantidadSeleccionada" />
-                </div>
-                <div class="col-md-3">
-                    <button class="btn btn-outline-primary w-100" @onclick="AgregarRenglon">+ Agregar</button>
+    <div class="row g-3 mb-4">
+        @* Izquierda: seleccionar artículos *@
+        <div class="col-lg-8">
+            <div class="card h-100">
+                <div class="card-header fw-semibold">Seleccionar artículos</div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-7">
+                            <input class="form-control" placeholder="Buscar modelo / SKU"
+                                   @bind="busquedaProducto" @bind:event="oninput" />
+                        </div>
+                        <div class="col-md-5">
+                            <button class="btn btn-outline-primary w-100" @onclick="AgregarSeleccionAlPedido">
+                                + Agregar al pedido
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Modelo / SKU</th>
+                                    <th class="text-end" style="width:120px">Disponible</th>
+                                    <th class="text-center" style="width:130px">Cant. Pedido</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in ProductosFiltradosCliente)
+                                {
+                                    <tr>
+                                        <td>@p.Codigo — @p.Nombre</td>
+                                        <td class="text-end">@p.CantidadDisponible</td>
+                                        <td class="text-center">
+                                            <input type="number" min="0" max="@p.CantidadDisponible"
+                                                   class="form-control form-control-sm text-center"
+                                                   value="@CantidadDe(p.Id)"
+                                                   @onchange="(e) => SetCantidad(p.Id, e)" />
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!ProductosFiltradosCliente.Any())
+                                {
+                                    <tr><td colspan="3" class="text-center text-muted py-3">No hay artículos.</td></tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-bold">
+                                    <td>Total</td>
+                                    <td class="text-end">@ProductosFiltradosCliente.Sum(p => p.CantidadDisponible)</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            @if (renglones.Count > 0)
-            {
-                <table class="table table-sm mt-3">
-                    <thead><tr><th>Producto</th><th class="text-end">Cantidad</th><th></th></tr></thead>
-                    <tbody>
-                        @foreach (var r in renglones)
-                        {
-                            <tr>
-                                <td>@r.Nombre</td>
-                                <td class="text-end">@r.Cantidad</td>
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => QuitarRenglon(r)">Quitar</button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-                <textarea class="form-control mb-2" placeholder="Notas (opcional)" @bind="notas"></textarea>
-                <button class="btn btn-primary" @onclick="EnviarSolicitudAsync">Enviar solicitud</button>
-            }
+        @* Derecha: pedido creado *@
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header fw-semibold">Pedido creado</div>
+                <div class="card-body d-flex flex-column">
+                    <p class="mb-2">Artículos en el pedido: <strong>@renglones.Count</strong></p>
 
-            @if (mensaje is not null)
-            {
-                <div class="alert alert-success mt-3 mb-0">@mensaje</div>
-            }
+                    @if (renglones.Count > 0)
+                    {
+                        <ul class="list-group list-group-flush mb-3">
+                            @foreach (var r in renglones)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <span class="small">@r.Nombre</span>
+                                    <span>
+                                        <span class="badge text-bg-secondary me-2">@r.Cantidad</span>
+                                        <button class="btn btn-sm btn-outline-danger py-0" @onclick="() => QuitarRenglon(r)">×</button>
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                        <textarea class="form-control mb-2" placeholder="Notas (opcional)" @bind="notas"></textarea>
+                        <button class="btn btn-primary mt-auto" @onclick="EnviarSolicitudAsync">
+                            Finalizar y enviar solicitud
+                        </button>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">
+                            Captura cantidades en la tabla de la izquierda y presiona <strong>Agregar al pedido</strong>.
+                        </p>
+                    }
+
+                    @if (mensaje is not null)
+                    {
+                        <div class="alert alert-success mt-3 mb-0">@mensaje</div>
+                    }
+                </div>
+            </div>
         </div>
     </div>
 }
@@ -72,18 +122,18 @@
 <div class="card mb-3">
     <div class="card-body py-3">
         <div class="row g-2 align-items-end">
-            <div class="col-6 col-md-3">
-                <label class="form-label small mb-1">Estado</label>
-                <select class="form-select form-select-sm" @bind="filtroEstado" @bind:after="AplicarFiltrosAsync">
-                    <option value="-2">Todos</option>
-                    <option value="0">Pendiente (lista de espera)</option>
-                    <option value="2">Surtida</option>
-                    <option value="4">Entregada</option>
-                    <option value="3">Rechazada</option>
-                </select>
-            </div>
             @if (esAdmin)
             {
+                <div class="col-6 col-md-3">
+                    <label class="form-label small mb-1">Estado</label>
+                    <select class="form-select form-select-sm" @bind="filtroEstado" @bind:after="AplicarFiltrosAsync">
+                        <option value="-2">Todos</option>
+                        <option value="0">Pendiente (lista de espera)</option>
+                        <option value="2">Surtida</option>
+                        <option value="4">Entregada</option>
+                        <option value="3">Rechazada</option>
+                    </select>
+                </div>
                 <div class="col-6 col-md-4">
                     <label class="form-label small mb-1">Cliente</label>
                     <select class="form-select form-select-sm" @bind="filtroClienteId" @bind:after="AplicarFiltrosAsync">
@@ -294,11 +344,48 @@ else
     /// <summary>Folio único e irrepetible del pedido (basado en su Id).</summary>
     private static string Folio(SolicitudPedido s) => $"SOL-{s.Id:00000}";
 
-    // Builder de la nueva solicitud
-    private int productoSeleccionado;
-    private int cantidadSeleccionada = 1;
+    // Builder de la nueva solicitud (cliente)
+    private string busquedaProducto = "";
+    private readonly Dictionary<int, int> cantidades = [];
     private string? notas;
     private readonly List<Renglon> renglones = [];
+
+    private IEnumerable<Producto> ProductosFiltradosCliente =>
+        string.IsNullOrWhiteSpace(busquedaProducto)
+            ? misProductos
+            : misProductos.Where(p =>
+                (p.Nombre?.Contains(busquedaProducto, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (p.Codigo?.Contains(busquedaProducto, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private int CantidadDe(int productoId) =>
+        cantidades.TryGetValue(productoId, out var c) ? c : 0;
+
+    private void SetCantidad(int productoId, ChangeEventArgs e)
+    {
+        var prod = misProductos.FirstOrDefault(p => p.Id == productoId);
+        if (!int.TryParse(e.Value?.ToString(), out var valor) || valor < 0) valor = 0;
+        if (prod is not null && valor > prod.CantidadDisponible) valor = prod.CantidadDisponible;
+        cantidades[productoId] = valor;
+    }
+
+    /// <summary>Pasa las cantidades capturadas en la tabla al pedido (renglones).</summary>
+    private void AgregarSeleccionAlPedido()
+    {
+        foreach (var (productoId, cantidad) in cantidades)
+        {
+            if (cantidad <= 0) continue;
+            var prod = misProductos.FirstOrDefault(p => p.Id == productoId);
+            if (prod is null) continue;
+
+            var existente = renglones.FirstOrDefault(r => r.ProductoId == productoId);
+            if (existente is not null)
+                existente.Cantidad = cantidad;
+            else
+                renglones.Add(new Renglon { ProductoId = productoId, Nombre = $"{prod.Codigo} — {prod.Nombre}", Cantidad = cantidad });
+        }
+        cantidades.Clear();
+        mensaje = null;
+    }
     private string? mensaje;
     private string? errorAccion;
     private bool procesando;
@@ -520,22 +607,6 @@ else
     }
 
     private static string Money(decimal m) => $"${m:N2} MXN";
-
-    private void AgregarRenglon()
-    {
-        if (productoSeleccionado == 0 || cantidadSeleccionada <= 0) return;
-        var prod = misProductos.FirstOrDefault(p => p.Id == productoSeleccionado);
-        if (prod is null) return;
-
-        var existente = renglones.FirstOrDefault(r => r.ProductoId == prod.Id);
-        if (existente is not null)
-            existente.Cantidad += cantidadSeleccionada;
-        else
-            renglones.Add(new Renglon { ProductoId = prod.Id, Nombre = $"{prod.Codigo} — {prod.Nombre}", Cantidad = cantidadSeleccionada });
-
-        productoSeleccionado = 0;
-        cantidadSeleccionada = 1;
-    }
 
     private void QuitarRenglon(Renglon r) => renglones.Remove(r);
 

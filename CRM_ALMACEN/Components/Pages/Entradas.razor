@@ -17,13 +17,23 @@
             <EditForm Model="nueva" OnValidSubmit="RegistrarAsync" FormName="formEntrada">
                 <DataAnnotationsValidator />
                 <div class="row g-3">
-                    <div class="col-md-5">
-                        <label class="form-label">Producto</label>
-                        <InputSelect class="form-select" @bind-Value="nueva.ProductoId">
+                    <div class="col-md-4">
+                        <label class="form-label">Cliente</label>
+                        <InputSelect class="form-select" Value="clienteSeleccionado" ValueExpression="() => clienteSeleccionado" ValueChanged="(int v) => OnClienteChanged(v)">
                             <option value="0">-- Selecciona --</option>
-                            @foreach (var p in productosDisponibles)
+                            @foreach (var c in clientes)
                             {
-                                <option value="@p.Id">@p.Codigo — @p.Nombre (@p.Cliente?.Nombre)</option>
+                                <option value="@c.Id">@c.Nombre</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Producto</label>
+                        <InputSelect class="form-select" @bind-Value="nueva.ProductoId" disabled="@(clienteSeleccionado == 0)">
+                            <option value="0">@(clienteSeleccionado == 0 ? "-- Elige un cliente primero --" : "-- Selecciona --")</option>
+                            @foreach (var p in productosFiltrados)
+                            {
+                                <option value="@p.Id">@p.Codigo — @p.Nombre</option>
                             }
                         </InputSelect>
                     </div>
@@ -31,12 +41,12 @@
                         <label class="form-label">Cantidad</label>
                         <InputNumber class="form-control" @bind-Value="nueva.Cantidad" />
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Referencia</label>
                         <InputText class="form-control" @bind-Value="nueva.Referencia" placeholder="Remisión / factura" />
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-success w-100">Registrar</button>
+                    <div class="col-12 col-md-3">
+                        <button type="submit" class="btn btn-success w-100" disabled="@(clienteSeleccionado == 0)">Registrar</button>
                     </div>
                     <div class="col-12">
                         <InputText class="form-control" @bind-Value="nueva.Observaciones" placeholder="Observaciones (opcional)" />
@@ -95,10 +105,21 @@ else
 
     private List<Entrada>? entradas;
     private List<Producto> productosDisponibles = [];
+    private List<Cliente> clientes = [];
+    private int clienteSeleccionado;
     private bool esAdmin;
     private int? clienteId;
     private string? usuario;
     private string? mensaje;
+
+    private IEnumerable<Producto> productosFiltrados =>
+        productosDisponibles.Where(p => p.ClienteId == clienteSeleccionado);
+
+    private void OnClienteChanged(int valor)
+    {
+        clienteSeleccionado = valor;
+        nueva.ProductoId = 0;
+    }
 
     private NuevaEntrada nueva = new();
 
@@ -122,8 +143,11 @@ else
         entradas = await query.OrderByDescending(e => e.Fecha).Take(200).ToListAsync();
 
         if (esAdmin)
+        {
             productosDisponibles = await db.Productos.Include(p => p.Cliente)
                 .Where(p => p.Activo).OrderBy(p => p.Nombre).ToListAsync();
+            clientes = await db.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+        }
     }
 
     private async Task RegistrarAsync()
