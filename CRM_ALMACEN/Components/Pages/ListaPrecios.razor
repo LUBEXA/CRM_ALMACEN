@@ -1,0 +1,174 @@
+@page "/lista-precios"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Lista de precios - CRM Almacén</PageTitle>
+
+<h1>🏷️ Lista de precios</h1>
+<p class="text-muted">
+    Catálogo general de los servicios que ofreces, con su precio sugerido. Estos servicios
+    aparecen como lista desplegable al asignar costos a cada cliente, donde el importe
+    puede ajustarse según el cliente.
+</p>
+
+<div class="card mb-4">
+    <div class="card-header">Agregar servicio</div>
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-7">
+                <label class="form-label">Nombre del servicio</label>
+                <input class="form-control" @bind="nuevoNombre" placeholder="Ej. Renta de tarima mediana" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Precio sugerido (MXN)</label>
+                <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    <input type="number" step="0.01" min="0" class="form-control" @bind="nuevoImporte" />
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" @onclick="AgregarAsync" disabled="@guardando">
+                    <span class="bi bi-plus-lg"></span> Agregar
+                </button>
+            </div>
+        </div>
+        @if (mensaje is not null)
+        {
+            <div class="alert @(error ? "alert-danger" : "alert-success") mt-3 mb-0">@mensaje</div>
+        }
+    </div>
+</div>
+
+@if (servicios is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th style="width:55%">Servicio</th>
+                <th style="width:25%">Precio (MXN)</th>
+                <th style="width:10%">Estado</th>
+                <th style="width:10%"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in servicios)
+            {
+                var item = s;
+                <tr>
+                    <td><input class="form-control" @bind="item.Nombre" /></td>
+                    <td>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" step="0.01" min="0" class="form-control" @bind="item.ImporteNeto" />
+                        </div>
+                    </td>
+                    <td>
+                        <div class="form-check form-switch">
+                            <input type="checkbox" class="form-check-input" @bind="item.Activo" />
+                            <label class="form-check-label small">@(item.Activo ? "Activo" : "Inactivo")</label>
+                        </div>
+                    </td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GuardarFilaAsync(item)" disabled="@guardando">
+                            <span class="bi bi-check-lg"></span> Guardar
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(item)" disabled="@guardando">
+                            <span class="bi bi-trash"></span>
+                        </button>
+                    </td>
+                </tr>
+            }
+            @if (servicios.Count == 0)
+            {
+                <tr><td colspan="4" class="text-center text-muted py-4">Todavía no hay servicios en la lista de precios.</td></tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Servicio>? servicios;
+    private string? nuevoNombre;
+    private decimal nuevoImporte;
+    private string? mensaje;
+    private bool error;
+    private bool guardando;
+
+    protected override async Task OnInitializedAsync() => await CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        servicios = await db.Servicios.OrderBy(s => s.Nombre).ToListAsync();
+    }
+
+    private async Task AgregarAsync()
+    {
+        mensaje = null;
+        error = false;
+        var nombre = nuevoNombre?.Trim();
+        if (string.IsNullOrWhiteSpace(nombre))
+        {
+            error = true;
+            mensaje = "Escribe el nombre del servicio.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Servicios.Add(new Servicio { Nombre = nombre, ImporteNeto = nuevoImporte, Activo = true });
+            await db.SaveChangesAsync();
+            mensaje = $"Servicio '{nombre}' agregado.";
+            nuevoNombre = null;
+            nuevoImporte = 0;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
+    }
+
+    private async Task GuardarFilaAsync(Servicio s)
+    {
+        mensaje = null;
+        error = false;
+        if (string.IsNullOrWhiteSpace(s.Nombre))
+        {
+            error = true;
+            mensaje = "El servicio necesita un nombre.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            s.Nombre = s.Nombre.Trim();
+            db.Servicios.Update(s);
+            await db.SaveChangesAsync();
+            mensaje = "Cambios guardados.";
+        }
+        finally { guardando = false; }
+    }
+
+    private async Task EliminarAsync(Servicio s)
+    {
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Servicios.Remove(s);
+            await db.SaveChangesAsync();
+            mensaje = $"Servicio '{s.Nombre}' eliminado.";
+            error = false;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
+    }
+}

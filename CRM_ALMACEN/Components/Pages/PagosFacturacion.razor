@@ -61,7 +61,9 @@ else
                     <thead>
                         <tr>
                             <th>Concepto</th>
+                            @if (esAdmin) { <th style="min-width:140px">Tipo</th> }
                             <th class="text-center">Cantidad</th>
+                            @if (esAdmin) { <th class="text-end" style="min-width:140px">Precio unitario</th> }
                             <th class="text-end">Importe</th>
                             @if (esAdmin) { <th></th> }
                         </tr>
@@ -73,13 +75,22 @@ else
                                 @if (esAdmin)
                                 {
                                     <td><input class="form-control form-control-sm" @bind="c.Concepto" /></td>
-                                    <td style="max-width:110px"><input type="number" min="1" class="form-control form-control-sm text-center" @bind="c.Cantidad" /></td>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="c.Tipo" @bind:after="() => RecalcularCargo(c)">
+                                            @foreach (var t in Enum.GetValues<TipoCargo>())
+                                            {
+                                                <option value="@t">@TipoTexto(t)</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td style="max-width:100px"><input type="number" min="1" class="form-control form-control-sm text-center" @bind="c.Cantidad" @bind:after="() => RecalcularCargo(c)" /></td>
                                     <td style="max-width:160px">
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text">$</span>
-                                            <input type="number" step="0.01" min="0" class="form-control text-end" @bind="c.Monto" />
+                                            <input type="number" step="0.01" class="form-control text-end" @bind="c.PrecioUnitario" @bind:after="() => RecalcularCargo(c)" />
                                         </div>
                                     </td>
+                                    <td class="text-end fw-semibold @(c.Monto < 0 ? "text-success" : "")">@Money(c.Monto)</td>
                                     <td class="text-end">
                                         <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarCargoAsync(c.Id)" title="Eliminar">
                                             <span class="bi bi-trash"></span>
@@ -88,35 +99,38 @@ else
                                 }
                                 else
                                 {
-                                    <td>@c.Concepto</td>
+                                    <td>
+                                        @c.Concepto
+                                        @if (c.Tipo != TipoCargo.Servicio)
+                                        {
+                                            <span class="badge text-bg-light text-muted ms-1">@c.TipoTexto</span>
+                                        }
+                                    </td>
                                     <td class="text-center">@c.Cantidad</td>
-                                    <td class="text-end">@Money(c.Monto)</td>
+                                    <td class="text-end @(c.Monto < 0 ? "text-success" : "")">@Money(c.Monto)</td>
                                 }
                             </tr>
                         }
                         @if (cargosPeriodo.Count == 0)
                         {
-                            <tr><td colspan="@(esAdmin ? 4 : 3)" class="text-center text-muted py-3">Sin cargos en este periodo.</td></tr>
+                            <tr><td colspan="@(esAdmin ? 6 : 3)" class="text-center text-muted py-3">Sin cargos en este periodo.</td></tr>
                         }
                     </tbody>
                     @if (cargosPeriodo.Count > 0)
                     {
                         <tfoot>
                             <tr class="periodo-total">
-                                <td class="fw-bold">Total del periodo</td>
-                                <td></td>
+                                <td class="fw-bold" colspan="@(esAdmin ? 4 : 2)">Total del periodo</td>
                                 <td class="text-end fw-bold">@Money(TotalCargos)</td>
                                 @if (esAdmin) { <td></td> }
                             </tr>
                             <tr>
-                                <td class="text-muted">Pagado</td>
-                                <td></td>
+                                <td class="text-muted" colspan="@(esAdmin ? 4 : 2)">Pagado</td>
                                 <td class="text-end text-success">@Money(TotalPagado)</td>
                                 @if (esAdmin) { <td></td> }
                             </tr>
                             <tr>
-                                <td class="fw-semibold">Saldo pendiente</td>
-                                <td></td>
+                                <td class="fw-semibold" colspan="@(esAdmin ? 4 : 2)">Saldo pendiente</td>
                                 <td class="text-end fw-semibold @(Saldo > 0 ? "text-danger" : "text-success")">@Money(Saldo)</td>
                                 @if (esAdmin) { <td></td> }
                             </tr>
@@ -142,22 +156,34 @@ else
                 </div>
 
                 <div class="row g-2 align-items-end">
-                    <div class="col-md-5">
+                    <div class="col-md-4">
                         <label class="form-label small">Concepto (manual)</label>
                         <input class="form-control form-control-sm" @bind="nuevoCargo.Concepto" placeholder="Ej. Maniobra extra" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Tipo</label>
+                        <select class="form-select form-select-sm" @bind="nuevoCargo.Tipo">
+                            @foreach (var t in Enum.GetValues<TipoCargo>())
+                            {
+                                <option value="@t">@TipoTexto(t)</option>
+                            }
+                        </select>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label small">Cantidad</label>
                         <input type="number" min="1" class="form-control form-control-sm" @bind="nuevoCargo.Cantidad" />
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label small">Importe (MXN)</label>
-                        <input type="number" step="0.01" min="0" class="form-control form-control-sm" @bind="nuevoCargo.Monto" />
+                    <div class="col-md-2">
+                        <label class="form-label small">Precio unitario</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm" @bind="nuevoCargo.PrecioUnitario" />
                     </div>
                     <div class="col-md-2">
                         <button class="btn btn-sm btn-success w-100" @onclick="AgregarCargoAsync" disabled="@procesando">+ Agregar</button>
                     </div>
                 </div>
+                <p class="text-muted small mt-2 mb-0">
+                    El importe se calcula solo (Cantidad × Precio unitario). En «Descuento» el importe se resta automáticamente.
+                </p>
             }
         </div>
     </div>
@@ -167,61 +193,100 @@ else
         <div class="card-body p-4">
             <h5 class="text-primary mb-3">Pagos y facturas de @NombresMes.Get(PeriodoMes) @PeriodoAnio</h5>
 
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th class="text-end">Monto</th>
-                            <th>Método de pago</th>
-                            <th>Referencia</th>
-                            <th class="text-center">XML</th>
-                            <th class="text-center">PDF</th>
-                            @if (esAdmin) { <th></th> }
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var p in pagosPeriodo)
-                        {
+            @if (esAdmin)
+            {
+                @* Vista de administrador: una tarjeta editable por pago (los campos se acomodan solos). *@
+                @if (pagosPeriodo.Count == 0)
+                {
+                    <p class="text-muted"><em>Sin pagos en este periodo.</em></p>
+                }
+                else
+                {
+                    @foreach (var p in pagosPeriodo)
+                    {
+                        var pago = p;
+                        <div class="border rounded p-3 mb-3 bg-light-subtle">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6 col-lg-3">
+                                    <label class="form-label small mb-1">Fecha y hora</label>
+                                    <input type="datetime-local" class="form-control form-control-sm" @bind="pago.Fecha" />
+                                </div>
+                                <div class="col-6 col-md-3 col-lg-2">
+                                    <label class="form-label small mb-1">Monto</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" step="0.01" min="0" class="form-control text-end" @bind="pago.Monto" />
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3 col-lg-3">
+                                    <label class="form-label small mb-1">Método de pago</label>
+                                    <select class="form-select form-select-sm" @bind="pago.MetodoPago">
+                                        @foreach (var m in Enum.GetValues<MetodoPago>())
+                                        {
+                                            <option value="@m">@MetodoTexto(m)</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label small mb-1">Referencia</label>
+                                    <input class="form-control form-control-sm" @bind="pago.Referencia" placeholder="Opcional" />
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-5">
+                                    <label class="form-label small mb-1">
+                                        Factura XML
+                                        @if (!string.IsNullOrEmpty(pago.XmlArchivo))
+                                        {
+                                            <a href="@pago.XmlArchivo" target="_blank" class="ms-1" title="Ver XML actual"><span class="bi bi-filetype-xml"></span> Ver actual</a>
+                                        }
+                                    </label>
+                                    <InputFile OnChange="(e) => SubirXmlPago(e, pago)" class="form-control form-control-sm" accept=".xml" />
+                                </div>
+                                <div class="col-12 col-md-6 col-lg-5">
+                                    <label class="form-label small mb-1">
+                                        Factura PDF
+                                        @if (!string.IsNullOrEmpty(pago.PdfArchivo))
+                                        {
+                                            <a href="@pago.PdfArchivo" target="_blank" class="ms-1 text-danger" title="Ver PDF actual"><span class="bi bi-filetype-pdf"></span> Ver actual</a>
+                                        }
+                                    </label>
+                                    <InputFile OnChange="(e) => SubirPdfPago(e, pago)" class="form-control form-control-sm" accept=".pdf" />
+                                </div>
+                                <div class="col-12 col-lg-2 d-flex align-items-end justify-content-lg-end">
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarPagoAsync(pago.Id)" title="Eliminar pago">
+                                        <span class="bi bi-trash"></span> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <button class="btn btn-sm btn-primary" @onclick="GuardarCambiosPagosAsync" disabled="@procesando">
+                        <span class="bi bi-save"></span> Guardar cambios de pagos
+                    </button>
+                    @if (subiendo) { <span class="text-muted ms-2 small">Subiendo archivo...</span> }
+                    @if (mensajePago is not null) { <span class="text-success ms-2 small">@mensajePago</span> }
+                }
+            }
+            else
+            {
+                @* Vista del cliente: solo lectura, en tabla. *@
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
                             <tr>
-                                @if (esAdmin)
-                                {
-                                    <td style="min-width:185px"><input type="datetime-local" class="form-control form-control-sm" @bind="p.Fecha" /></td>
-                                    <td style="max-width:150px">
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text">$</span>
-                                            <input type="number" step="0.01" min="0" class="form-control text-end" @bind="p.Monto" />
-                                        </div>
-                                    </td>
-                                    <td style="min-width:150px">
-                                        <select class="form-select form-select-sm" @bind="p.MetodoPago">
-                                            @foreach (var m in Enum.GetValues<MetodoPago>())
-                                            {
-                                                <option value="@m">@MetodoTexto(m)</option>
-                                            }
-                                        </select>
-                                    </td>
-                                    <td><input class="form-control form-control-sm" @bind="p.Referencia" /></td>
-                                    <td class="text-center" style="min-width:130px">
-                                        @if (!string.IsNullOrEmpty(p.XmlArchivo))
-                                        {
-                                            <a href="@p.XmlArchivo" target="_blank" title="Ver XML"><span class="bi bi-filetype-xml fs-5"></span></a>
-                                        }
-                                        <InputFile OnChange="(e) => SubirXmlPago(e, p)" class="form-control form-control-sm mt-1" accept=".xml" />
-                                    </td>
-                                    <td class="text-center" style="min-width:130px">
-                                        @if (!string.IsNullOrEmpty(p.PdfArchivo))
-                                        {
-                                            <a href="@p.PdfArchivo" target="_blank" title="Ver PDF"><span class="bi bi-filetype-pdf fs-5 text-danger"></span></a>
-                                        }
-                                        <InputFile OnChange="(e) => SubirPdfPago(e, p)" class="form-control form-control-sm mt-1" accept=".pdf" />
-                                    </td>
-                                    <td class="text-end">
-                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarPagoAsync(p.Id)" title="Eliminar pago"><span class="bi bi-trash"></span></button>
-                                    </td>
-                                }
-                                else
-                                {
+                                <th>Fecha</th>
+                                <th class="text-end">Monto</th>
+                                <th>Método de pago</th>
+                                <th>Referencia</th>
+                                <th class="text-center">XML</th>
+                                <th class="text-center">PDF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in pagosPeriodo)
+                            {
+                                <tr>
                                     <td>@p.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
                                     <td class="text-end fw-semibold">@Money(p.Monto)</td>
                                     <td>@p.MetodoTexto</td>
@@ -240,24 +305,15 @@ else
                                         }
                                         else { <span class="text-muted">—</span> }
                                     </td>
-                                }
-                            </tr>
-                        }
-                        @if (pagosPeriodo.Count == 0)
-                        {
-                            <tr><td colspan="@(esAdmin ? 7 : 6)" class="text-center text-muted py-3">Sin pagos en este periodo.</td></tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-
-            @if (esAdmin && pagosPeriodo.Count > 0)
-            {
-                <button class="btn btn-sm btn-primary" @onclick="GuardarCambiosPagosAsync" disabled="@procesando">
-                    <span class="bi bi-save"></span> Guardar cambios de pagos
-                </button>
-                @if (subiendo) { <span class="text-muted ms-2 small">Subiendo archivo...</span> }
-                @if (mensajePago is not null) { <span class="text-success ms-2 small">@mensajePago</span> }
+                                </tr>
+                            }
+                            @if (pagosPeriodo.Count == 0)
+                            {
+                                <tr><td colspan="6" class="text-center text-muted py-3">Sin pagos en este periodo.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             }
 
             @if (esAdmin)
@@ -513,7 +569,9 @@ else
                     Anio = PeriodoAnio,
                     Mes = PeriodoMes,
                     Concepto = t.Concepto,
+                    Tipo = TipoCargo.Servicio,
                     Cantidad = 1,
+                    PrecioUnitario = t.ImporteNeto,
                     Monto = t.ImporteNeto
                 });
                 agregados++;
@@ -529,10 +587,11 @@ else
 
     private async Task AgregarCargoAsync()
     {
-        if (clienteId is not int id || string.IsNullOrWhiteSpace(nuevoCargo.Concepto) || nuevoCargo.Monto < 0) return;
+        if (clienteId is not int id || string.IsNullOrWhiteSpace(nuevoCargo.Concepto)) return;
         procesando = true;
         try
         {
+            RecalcularCargo(nuevoCargo);
             await using var db = await DbFactory.CreateDbContextAsync();
             db.Cargos.Add(new Cargo
             {
@@ -540,7 +599,9 @@ else
                 Anio = PeriodoAnio,
                 Mes = PeriodoMes,
                 Concepto = nuevoCargo.Concepto.Trim(),
+                Tipo = nuevoCargo.Tipo,
                 Cantidad = nuevoCargo.Cantidad <= 0 ? 1 : nuevoCargo.Cantidad,
+                PrecioUnitario = nuevoCargo.PrecioUnitario,
                 Monto = nuevoCargo.Monto
             });
             await db.SaveChangesAsync();
@@ -559,13 +620,21 @@ else
             foreach (var c in cargosPeriodo)
             {
                 c.Concepto = c.Concepto.Trim();
-                if (c.Cantidad < 1) c.Cantidad = 1;
+                RecalcularCargo(c);
                 db.Cargos.Update(c);
             }
             await db.SaveChangesAsync();
             mensajeCargos = "Cambios guardados.";
         }
         finally { procesando = false; }
+    }
+
+    /// <summary>Recalcula el importe del cargo: Cantidad × Precio unitario (negativo en descuentos).</summary>
+    private void RecalcularCargo(Cargo c)
+    {
+        if (c.Cantidad < 1) c.Cantidad = 1;
+        var importe = c.Cantidad * c.PrecioUnitario;
+        c.Monto = c.Tipo == TipoCargo.Descuento ? -Math.Abs(importe) : importe;
     }
 
     private async Task EliminarCargoAsync(int cargoId)
@@ -702,6 +771,14 @@ else
     }
 
     private static string Money(decimal m) => $"${m:N2} MXN";
+
+    private static string TipoTexto(TipoCargo t) => t switch
+    {
+        TipoCargo.Descuento => "Descuento",
+        TipoCargo.Ajuste => "Ajuste",
+        TipoCargo.CobroPendiente => "Cobro pendiente",
+        _ => "Servicio"
+    };
 
     private static string MetodoTexto(MetodoPago m) => m switch
     {

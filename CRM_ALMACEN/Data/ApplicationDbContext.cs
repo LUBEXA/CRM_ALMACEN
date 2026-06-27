@@ -20,6 +20,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Cargo> Cargos => Set<Cargo>();
     public DbSet<Pago> Pagos => Set<Pago>();
     public DbSet<CostoServicio> CostosServicio => Set<CostoServicio>();
+    public DbSet<Servicio> Servicios => Set<Servicio>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -63,6 +64,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(c => c.Cliente).WithMany()
             .HasForeignKey(c => c.ClienteId).OnDelete(DeleteBehavior.Cascade);
 
+        builder.Entity<Cargo>()
+            .HasOne(c => c.SolicitudPedido).WithMany()
+            .HasForeignKey(c => c.SolicitudPedidoId).OnDelete(DeleteBehavior.SetNull);
+
         builder.Entity<Pago>()
             .HasOne(p => p.Cliente).WithMany()
             .HasForeignKey(p => p.ClienteId).OnDelete(DeleteBehavior.Cascade);
@@ -72,6 +77,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<CostoServicio>()
             .HasOne(c => c.Cliente).WithMany()
             .HasForeignKey(c => c.ClienteId).OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Servicio>().Property(s => s.ImporteNeto).HasPrecision(12, 2);
 
         // Vincular usuario -> cliente
         builder.Entity<ApplicationUser>()

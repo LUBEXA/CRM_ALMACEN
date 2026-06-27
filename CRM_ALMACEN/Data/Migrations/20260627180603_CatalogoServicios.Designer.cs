@@ -3,6 +3,7 @@ using System;
 using CRM_ALMACEN.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CRM_ALMACEN.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260627180603_CatalogoServicios")]
+    partial class CatalogoServicios
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -135,17 +138,12 @@ namespace CRM_ALMACEN.Data.Migrations
                     b.Property<decimal>("PrecioUnitario")
                         .HasColumnType("numeric");
 
-                    b.Property<int?>("SolicitudPedidoId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Tipo")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ClienteId");
-
-                    b.HasIndex("SolicitudPedidoId");
 
                     b.ToTable("Cargos");
                 });
@@ -654,14 +652,7 @@ namespace CRM_ALMACEN.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("CRM_ALMACEN.Models.SolicitudPedido", "SolicitudPedido")
-                        .WithMany()
-                        .HasForeignKey("SolicitudPedidoId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Cliente");
-
-                    b.Navigation("SolicitudPedido");
                 });
 
             modelBuilder.Entity("CRM_ALMACEN.Models.CostoServicio", b =>

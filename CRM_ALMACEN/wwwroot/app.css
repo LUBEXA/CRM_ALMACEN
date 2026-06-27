@@ -31,6 +31,7 @@ a, .btn-link { color: var(--azul-acento); }
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
+    transition: width .2s ease;
 }
 
 main {
@@ -59,6 +60,10 @@ main {
 .sidebar-brand {
     padding: 1.1rem 1.25rem 1rem;
     background: rgba(0,0,0,.18);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
 }
 
 .sidebar-brand .navbar-brand {
@@ -66,7 +71,29 @@ main {
     font-weight: 700;
     color: #fff;
     text-decoration: none;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
 }
+
+/* Botón para contraer / expandir el menú */
+.sidebar-collapse-toggle { display: none; }
+
+.sidebar-collapse-btn {
+    cursor: pointer;
+    color: #cfd6e4;
+    background: rgba(255,255,255,.08);
+    border-radius: .5rem;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background .15s, color .15s;
+}
+
+.sidebar-collapse-btn:hover { background: rgba(255,255,255,.18); color: #fff; }
 
 .sidebar-empresa {
     margin-top: .6rem;
@@ -115,6 +142,52 @@ main {
 }
 
 .navmenu-icon { display: none; }
+
+/* ---------- Menú contraído (solo iconos) ---------- */
+.sidebar:has(.sidebar-collapse-toggle:checked) {
+    width: 72px;
+}
+
+/* Ocultar todos los textos, dejando solo iconos */
+.sidebar:has(.sidebar-collapse-toggle:checked) .link-text {
+    display: none;
+}
+
+/* Centrar marca, botón e iconos */
+.sidebar:has(.sidebar-collapse-toggle:checked) .sidebar-brand {
+    justify-content: center;
+    padding-left: .5rem;
+    padding-right: .5rem;
+}
+
+.sidebar:has(.sidebar-collapse-toggle:checked) .navbar-brand {
+    flex: 0;
+    font-size: 1.4rem;
+}
+
+.sidebar:has(.sidebar-collapse-toggle:checked) .sidebar-empresa {
+    display: none;
+}
+
+.sidebar:has(.sidebar-collapse-toggle:checked) .nav-link {
+    justify-content: center;
+    gap: 0;
+    margin-left: .5rem;
+    margin-right: .5rem;
+    padding: .6rem 0;
+}
+
+/* Sección "Administración": se convierte en una línea divisoria */
+.sidebar:has(.sidebar-collapse-toggle:checked) .nav-section {
+    padding: .6rem 1rem .2rem;
+    border-top: 1px solid rgba(255,255,255,.12);
+    margin: .4rem .75rem 0;
+}
+
+/* Girar la flecha del botón al contraer */
+.sidebar:has(.sidebar-collapse-toggle:checked) .sidebar-collapse-btn .bi {
+    transform: rotate(180deg);
+}
 
 /* ---------- Barra superior ---------- */
 .top-row .usuario-info {

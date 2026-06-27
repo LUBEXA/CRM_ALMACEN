@@ -68,6 +68,45 @@
     </div>
 }
 
+@* ---- Filtros y búsqueda ---- *@
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-3">
+                <label class="form-label small mb-1">Estado</label>
+                <select class="form-select form-select-sm" @bind="filtroEstado" @bind:after="AplicarFiltrosAsync">
+                    <option value="-2">Todos</option>
+                    <option value="0">Pendiente (lista de espera)</option>
+                    <option value="2">Surtida</option>
+                    <option value="4">Entregada</option>
+                    <option value="3">Rechazada</option>
+                </select>
+            </div>
+            @if (esAdmin)
+            {
+                <div class="col-6 col-md-4">
+                    <label class="form-label small mb-1">Cliente</label>
+                    <select class="form-select form-select-sm" @bind="filtroClienteId" @bind:after="AplicarFiltrosAsync">
+                        <option value="0">Todos los clientes</option>
+                        @foreach (var c in clientes)
+                        {
+                            <option value="@c.Id">@c.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-8 col-md-3">
+                    <label class="form-label small mb-1">Buscar por folio o cliente</label>
+                    <input class="form-control form-control-sm" placeholder="Ej. SOL-00012 o un nombre" @bind="filtroBusqueda" @bind:after="AplicarFiltrosAsync" />
+                </div>
+            }
+            <div class="col-4 col-md-2 text-md-end">
+                <label class="form-label small mb-1 d-none d-md-block">&nbsp;</label>
+                <span class="badge text-bg-secondary">@totalRegistros pedido(s)</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 @* ---- Listado ---- *@
 @if (solicitudes is null)
 {
@@ -78,13 +117,13 @@ else
     @foreach (var s in solicitudes)
     {
         <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-1">
                 <span>
-                    <strong>Solicitud #@s.Id</strong>
-                    <span class="text-muted small ms-2">@s.Fecha.ToString("dd/MM/yyyy HH:mm")</span>
+                    <span class="badge text-bg-dark font-monospace me-1">@Folio(s)</span>
+                    <span class="text-muted small">@s.Fecha.ToString("dd/MM/yyyy HH:mm")</span>
                     @if (esAdmin)
                     {
-                        <span class="ms-2">— @s.Cliente?.Nombre</span>
+                        <span class="ms-2 fw-semibold">@s.Cliente?.Nombre</span>
                     }
                 </span>
                 <span class="badge @EstadoColor(s.Estado)">@s.Estado</span>
@@ -106,16 +145,129 @@ else
                     <button class="btn btn-sm btn-success me-2" @onclick="() => SurtirAsync(s.Id)">Aprobar y surtir</button>
                     <button class="btn btn-sm btn-outline-danger" @onclick="() => RechazarAsync(s.Id)">Rechazar</button>
                 }
+
+                @* ---- Cobros del pedido (solo administrador) ---- *@
+                @if (esAdmin)
+                {
+                    var cobros = CobrosDe(s.Id);
+                    var tarifario = TarifarioDe(s.ClienteId);
+                    var nuevo = NuevoCobroDe(s.Id);
+                    <details class="border-top mt-3 pt-3">
+                        <summary class="text-primary fw-semibold mb-2" style="cursor:pointer">
+                            <span class="bi bi-cash-coin"></span> Cobros de este pedido (@cobros.Count)
+                            <span class="text-muted small fw-normal">— estado de cuenta de @NombresMes.Get(s.Fecha.Month) @s.Fecha.Year</span>
+                        </summary>
+
+                        <div class="table-responsive mt-2">
+                            <table class="table table-sm align-middle mb-2">
+                                <thead>
+                                    <tr>
+                                        <th>Concepto</th>
+                                        <th class="text-center" style="width:90px">Cantidad</th>
+                                        <th class="text-end" style="width:150px">Precio unitario</th>
+                                        <th class="text-end" style="width:130px">Importe</th>
+                                        <th style="width:48px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var c in cobros)
+                                    {
+                                        <tr>
+                                            <td><input class="form-control form-control-sm" @bind="c.Concepto" /></td>
+                                            <td><input type="number" min="1" class="form-control form-control-sm text-center" @bind="c.Cantidad" @bind:after="() => RecalcularCargo(c)" /></td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" step="0.01" class="form-control text-end" @bind="c.PrecioUnitario" @bind:after="() => RecalcularCargo(c)" />
+                                                </div>
+                                            </td>
+                                            <td class="text-end fw-semibold">@Money(c.Monto)</td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarCobroAsync(c.Id, s.Id)" title="Quitar cobro"><span class="bi bi-trash"></span></button>
+                                            </td>
+                                        </tr>
+                                    }
+                                    @if (cobros.Count == 0)
+                                    {
+                                        <tr><td colspan="5" class="text-center text-muted py-2">Aún no hay cobros para este pedido.</td></tr>
+                                    }
+                                </tbody>
+                                @if (cobros.Count > 0)
+                                {
+                                    <tfoot>
+                                        <tr>
+                                            <td class="fw-bold" colspan="3">Total a cobrar</td>
+                                            <td class="text-end fw-bold">@Money(cobros.Sum(c => c.Monto))</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                }
+                            </table>
+                        </div>
+
+                        @* Fila para agregar un cobro: desde el tarifario o uno adicional *@
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1">Servicio contratado</label>
+                                <select class="form-select form-select-sm" value="0" @onchange="(e) => SeleccionarTarifario(s.Id, e)">
+                                    <option value="0">-- Concepto adicional (manual) --</option>
+                                    @foreach (var t in tarifario)
+                                    {
+                                        <option value="@t.Id">@t.Concepto — @Money(t.ImporteNeto)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">Concepto</label>
+                                <input class="form-control form-control-sm" @bind="nuevo.Concepto" placeholder="Ej. Maniobra extra" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Cantidad</label>
+                                <input type="number" min="1" class="form-control form-control-sm" @bind="nuevo.Cantidad" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Precio unitario</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm" @bind="nuevo.PrecioUnitario" />
+                            </div>
+                            <div class="col-md-1">
+                                <button class="btn btn-sm btn-success w-100" @onclick="() => AgregarCobroAsync(s)" disabled="@procesando">+</button>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
+                            @if (cobros.Count > 0)
+                            {
+                                <button class="btn btn-sm btn-primary" @onclick="() => GuardarCobrosAsync(s.Id)" disabled="@procesando">
+                                    <span class="bi bi-save"></span> Guardar cambios
+                                </button>
+                                <a class="btn btn-sm btn-outline-secondary" href="/pagos">Ver en estado de cuenta</a>
+                            }
+                            @if (mensajeCobro.TryGetValue(s.Id, out var msg) && msg is not null)
+                            {
+                                <span class="text-success small">@msg</span>
+                            }
+                        </div>
+                    </details>
+                }
             </div>
         </div>
     }
     @if (solicitudes.Count == 0)
     {
-        <p class="text-muted">No hay solicitudes.</p>
+        <p class="text-muted">No hay pedidos con los filtros seleccionados.</p>
     }
     @if (errorAccion is not null)
     {
         <div class="alert alert-danger">@errorAccion</div>
+    }
+
+    @if (TotalPaginas > 1)
+    {
+        <nav class="d-flex justify-content-between align-items-center mt-3 mb-4">
+            <button class="btn btn-sm btn-outline-secondary" disabled="@(pagina <= 1)" @onclick="PaginaAnteriorAsync">← Anteriores</button>
+            <span class="text-muted small">Página @pagina de @TotalPaginas</span>
+            <button class="btn btn-sm btn-outline-secondary" disabled="@(pagina >= TotalPaginas)" @onclick="PaginaSiguienteAsync">Siguientes →</button>
+        </nav>
     }
 }
 
@@ -125,9 +277,22 @@ else
 
     private List<SolicitudPedido>? solicitudes;
     private List<Producto> misProductos = [];
+    private List<Cliente> clientes = [];
     private bool esAdmin;
     private int? clienteId;
     private string? usuario;
+
+    // Filtros y paginación (lista de espera escalable).
+    private int filtroEstado;          // -2 = todos; si no, valor del enum EstadoSolicitud
+    private int filtroClienteId;       // 0 = todos los clientes (solo admin)
+    private string filtroBusqueda = "";
+    private int pagina = 1;
+    private const int PorPagina = 8;
+    private int totalRegistros;
+    private int TotalPaginas => totalRegistros == 0 ? 1 : (int)Math.Ceiling(totalRegistros / (double)PorPagina);
+
+    /// <summary>Folio único e irrepetible del pedido (basado en su Id).</summary>
+    private static string Folio(SolicitudPedido s) => $"SOL-{s.Id:00000}";
 
     // Builder de la nueva solicitud
     private int productoSeleccionado;
@@ -136,6 +301,13 @@ else
     private readonly List<Renglon> renglones = [];
     private string? mensaje;
     private string? errorAccion;
+    private bool procesando;
+
+    // Cobros (Cargos) por solicitud, tarifario por cliente y formularios de nuevo cobro.
+    private Dictionary<int, List<Cargo>> cobrosPorSolicitud = [];
+    private Dictionary<int, List<CostoServicio>> tarifarioPorCliente = [];
+    private readonly Dictionary<int, Cargo> nuevoCobroPorSolicitud = [];
+    private readonly Dictionary<int, string?> mensajeCobro = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -143,6 +315,33 @@ else
         esAdmin = user.EsAdmin();
         clienteId = user.ClienteId();
         usuario = user.Identity?.Name;
+
+        if (esAdmin)
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            clientes = await db.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+        }
+
+        await CargarAsync();
+    }
+
+    private async Task AplicarFiltrosAsync()
+    {
+        pagina = 1;
+        await CargarAsync();
+    }
+
+    private async Task PaginaAnteriorAsync()
+    {
+        if (pagina <= 1) return;
+        pagina--;
+        await CargarAsync();
+    }
+
+    private async Task PaginaSiguienteAsync()
+    {
+        if (pagina >= TotalPaginas) return;
+        pagina++;
         await CargarAsync();
     }
 
@@ -154,15 +353,173 @@ else
             .Include(s => s.Cliente)
             .Include(s => s.Detalles).ThenInclude(d => d.Producto)
             .AsQueryable();
+
+        // El cliente solo ve lo suyo; el admin puede filtrar por cliente.
         if (clienteId is int id)
             query = query.Where(s => s.ClienteId == id);
+        else if (filtroClienteId > 0)
+            query = query.Where(s => s.ClienteId == filtroClienteId);
 
-        solicitudes = await query.OrderByDescending(s => s.Fecha).Take(100).ToListAsync();
+        // Filtro por estado (-2 = todos).
+        if (filtroEstado != -2)
+        {
+            var estado = (EstadoSolicitud)filtroEstado;
+            query = query.Where(s => s.Estado == estado);
+        }
+
+        // Búsqueda por folio (Id) o nombre de cliente (solo admin).
+        if (esAdmin && !string.IsNullOrWhiteSpace(filtroBusqueda))
+        {
+            var texto = filtroBusqueda.Trim();
+            var digitos = new string(texto.Where(char.IsDigit).ToArray());
+            if (int.TryParse(digitos, out var folioId))
+                query = query.Where(s => s.Id == folioId || EF.Functions.ILike(s.Cliente!.Nombre, $"%{texto}%"));
+            else
+                query = query.Where(s => EF.Functions.ILike(s.Cliente!.Nombre, $"%{texto}%"));
+        }
+
+        totalRegistros = await query.CountAsync();
+
+        // Ajustar la página si quedó fuera de rango (p. ej. tras filtrar).
+        if (pagina > TotalPaginas) pagina = TotalPaginas;
+        if (pagina < 1) pagina = 1;
+
+        solicitudes = await query
+            .OrderByDescending(s => s.Fecha)
+            .Skip((pagina - 1) * PorPagina)
+            .Take(PorPagina)
+            .ToListAsync();
 
         if (clienteId is int cid)
             misProductos = await db.Productos.Where(p => p.Activo && p.ClienteId == cid)
                 .OrderBy(p => p.Nombre).ToListAsync();
+
+        if (esAdmin)
+        {
+            var ids = solicitudes.Select(s => s.Id).ToList();
+            cobrosPorSolicitud = (await db.Cargos
+                    .Where(c => c.SolicitudPedidoId != null && ids.Contains(c.SolicitudPedidoId!.Value))
+                    .OrderBy(c => c.Id).ToListAsync())
+                .GroupBy(c => c.SolicitudPedidoId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var clienteIds = solicitudes.Select(s => s.ClienteId).Distinct().ToList();
+            tarifarioPorCliente = (await db.CostosServicio
+                    .Where(c => clienteIds.Contains(c.ClienteId))
+                    .OrderBy(c => c.Concepto).ToListAsync())
+                .GroupBy(c => c.ClienteId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
     }
+
+    private List<Cargo> CobrosDe(int solicitudId) =>
+        cobrosPorSolicitud.TryGetValue(solicitudId, out var lista) ? lista : [];
+
+    private List<CostoServicio> TarifarioDe(int clienteId) =>
+        tarifarioPorCliente.TryGetValue(clienteId, out var lista) ? lista : [];
+
+    private Cargo NuevoCobroDe(int solicitudId)
+    {
+        if (!nuevoCobroPorSolicitud.TryGetValue(solicitudId, out var c))
+        {
+            c = new Cargo { Cantidad = 1 };
+            nuevoCobroPorSolicitud[solicitudId] = c;
+        }
+        return c;
+    }
+
+    private void SeleccionarTarifario(int solicitudId, ChangeEventArgs e)
+    {
+        var nuevo = NuevoCobroDe(solicitudId);
+        if (int.TryParse(e.Value?.ToString(), out var tid) && tid > 0)
+        {
+            var sol = solicitudes?.FirstOrDefault(s => s.Id == solicitudId);
+            var t = sol is null ? null : TarifarioDe(sol.ClienteId).FirstOrDefault(x => x.Id == tid);
+            if (t is not null)
+            {
+                nuevo.Concepto = t.Concepto;
+                nuevo.PrecioUnitario = t.ImporteNeto;
+                if (nuevo.Cantidad < 1) nuevo.Cantidad = 1;
+            }
+        }
+    }
+
+    private async Task AgregarCobroAsync(SolicitudPedido s)
+    {
+        var nuevo = NuevoCobroDe(s.Id);
+        if (string.IsNullOrWhiteSpace(nuevo.Concepto)) return;
+        procesando = true;
+        try
+        {
+            nuevo.Cantidad = nuevo.Cantidad < 1 ? 1 : nuevo.Cantidad;
+            RecalcularCargo(nuevo);
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Cargos.Add(new Cargo
+            {
+                ClienteId = s.ClienteId,
+                SolicitudPedidoId = s.Id,
+                Anio = s.Fecha.Year,
+                Mes = s.Fecha.Month,
+                Concepto = nuevo.Concepto.Trim(),
+                Tipo = TipoCargo.Servicio,
+                Cantidad = nuevo.Cantidad,
+                PrecioUnitario = nuevo.PrecioUnitario,
+                Monto = nuevo.Monto
+            });
+            await db.SaveChangesAsync();
+
+            nuevoCobroPorSolicitud[s.Id] = new Cargo { Cantidad = 1 };
+            mensajeCobro[s.Id] = "Cobro agregado al estado de cuenta.";
+            await CargarAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task GuardarCobrosAsync(int solicitudId)
+    {
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            foreach (var c in CobrosDe(solicitudId))
+            {
+                c.Concepto = c.Concepto.Trim();
+                RecalcularCargo(c);
+                db.Cargos.Update(c);
+            }
+            await db.SaveChangesAsync();
+            mensajeCobro[solicitudId] = "Cambios guardados.";
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task EliminarCobroAsync(int cargoId, int solicitudId)
+    {
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var cargo = await db.Cargos.FindAsync(cargoId);
+            if (cargo is not null)
+            {
+                db.Cargos.Remove(cargo);
+                await db.SaveChangesAsync();
+            }
+            mensajeCobro[solicitudId] = "Cobro eliminado.";
+            await CargarAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    /// <summary>Recalcula el importe del cobro: Cantidad × Precio unitario.</summary>
+    private static void RecalcularCargo(Cargo c)
+    {
+        if (c.Cantidad < 1) c.Cantidad = 1;
+        c.Monto = c.Cantidad * c.PrecioUnitario;
+    }
+
+    private static string Money(decimal m) => $"${m:N2} MXN";
 
     private void AgregarRenglon()
     {
@@ -234,7 +591,7 @@ else
             {
                 ProductoId = d.ProductoId,
                 Cantidad = d.Cantidad,
-                Referencia = $"Solicitud #{solicitud.Id}",
+                Referencia = Folio(solicitud),
                 SolicitudPedidoId = solicitud.Id,
                 RegistradoPor = usuario,
                 Fecha = DateTime.Now

@@ -220,13 +220,27 @@ else
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="text-primary mb-0">Costos del servicio</h5>
-                <button class="btn btn-sm btn-primary" @onclick="AgregarCosto">
-                    <span class="bi bi-plus-lg"></span> Agregar
-                </button>
+                <div class="d-flex gap-2">
+                    @if (serviciosCatalogo.Count > 0)
+                    {
+                        <select class="form-select form-select-sm" style="width:auto" value="0"
+                                @onchange="AgregarDesdeCatalogo">
+                            <option value="0">+ Agregar de la lista de precios…</option>
+                            @foreach (var s in serviciosCatalogo)
+                            {
+                                <option value="@s.Id">@s.Nombre — @s.ImporteNeto.ToString("N2") MXN</option>
+                            }
+                        </select>
+                    }
+                    <button class="btn btn-sm btn-outline-primary" @onclick="AgregarCosto">
+                        <span class="bi bi-plus-lg"></span> Otro servicio
+                    </button>
+                </div>
             </div>
             <p class="text-muted small">
-                Define los conceptos e importes que incluye el servicio. El cliente los verá
-                de forma informativa en su perfil.
+                Elige servicios de la <strong>lista de precios</strong> (trae el precio sugerido, que
+                puedes ajustar para este cliente) o usa «Otro servicio» para uno que no esté en el
+                catálogo. El cliente los verá de forma informativa en su perfil.
             </p>
 
             @if (costos.Count == 0)
@@ -294,6 +308,7 @@ else
 
     // Costos del servicio (tarifario).
     private List<CostoServicio> costos = new();
+    private List<Servicio> serviciosCatalogo = new();
     private bool guardandoCostos;
     private string? mensajeCostos;
     private string? errorCostos;
@@ -322,6 +337,10 @@ else
             .Where(c => c.ClienteId == Id)
             .OrderBy(c => c.Id)
             .ToListAsync();
+        serviciosCatalogo = await db.Servicios
+            .Where(s => s.Activo)
+            .OrderBy(s => s.Nombre)
+            .ToListAsync();
     }
 
     private void AgregarCosto()
@@ -329,6 +348,25 @@ else
         mensajeCostos = null;
         errorCostos = null;
         costos.Add(new CostoServicio { ClienteId = Id });
+    }
+
+    // Agrega una fila tomando el concepto y precio sugerido del catálogo (editable después).
+    private void AgregarDesdeCatalogo(ChangeEventArgs e)
+    {
+        mensajeCostos = null;
+        errorCostos = null;
+        if (!int.TryParse(e.Value?.ToString(), out var servicioId) || servicioId == 0)
+            return;
+
+        var servicio = serviciosCatalogo.FirstOrDefault(s => s.Id == servicioId);
+        if (servicio is null) return;
+
+        costos.Add(new CostoServicio
+        {
+            ClienteId = Id,
+            Concepto = servicio.Nombre,
+            ImporteNeto = servicio.ImporteNeto
+        });
     }
 
     private void QuitarCosto(int indice)
@@ -364,15 +402,26 @@ else
                     db.CostosServicio.Remove(e);
             }
 
-            // Agregar nuevos y actualizar los existentes.
+            // Agregar nuevos y actualizar los existentes (sobre la entidad ya rastreada,
+            // para no duplicar el seguimiento de una misma clave).
             foreach (var c in costos)
             {
                 c.Concepto = c.Concepto.Trim();
                 c.ClienteId = Id;
                 if (c.Id == 0)
+                {
                     db.CostosServicio.Add(c);
+                }
                 else
-                    db.CostosServicio.Update(c);
+                {
+                    var tracked = existentes.FirstOrDefault(e => e.Id == c.Id);
+                    if (tracked is not null)
+                    {
+                        tracked.Concepto = c.Concepto;
+                        tracked.ImporteNeto = c.ImporteNeto;
+                        tracked.ClienteId = Id;
+                    }
+                }
             }
 
             await db.SaveChangesAsync();
