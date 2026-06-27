@@ -17,6 +17,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Salida> Salidas => Set<Salida>();
     public DbSet<SolicitudPedido> Solicitudes => Set<SolicitudPedido>();
     public DbSet<DetalleSolicitud> DetallesSolicitud => Set<DetalleSolicitud>();
+    public DbSet<Cargo> Cargos => Set<Cargo>();
+    public DbSet<Pago> Pagos => Set<Pago>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -51,6 +53,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(d => d.ProductoId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Montos con 2 decimales
+        builder.Entity<Cargo>().Property(c => c.Monto).HasPrecision(12, 2);
+        builder.Entity<Pago>().Property(p => p.Monto).HasPrecision(12, 2);
+
+        builder.Entity<Cargo>()
+            .HasOne(c => c.Cliente).WithMany()
+            .HasForeignKey(c => c.ClienteId).OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Pago>()
+            .HasOne(p => p.Cliente).WithMany()
+            .HasForeignKey(p => p.ClienteId).OnDelete(DeleteBehavior.Cascade);
 
         // Vincular usuario -> cliente
         builder.Entity<ApplicationUser>()

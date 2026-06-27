@@ -82,5 +82,27 @@ public static class DbSeeder
                 await userManager.AddToRoleAsync(userCliente, RolCliente);
             }
         }
+
+        // 5. Cargos del periodo actual y pagos de ejemplo (cliente demo)
+        if (!await db.Cargos.AnyAsync())
+        {
+            var cliente = await db.Clientes.OrderBy(c => c.Id).FirstOrDefaultAsync();
+            if (cliente is not null)
+            {
+                var hoy = DateTime.Now;
+                db.Cargos.AddRange(
+                    new Cargo { ClienteId = cliente.Id, Anio = hoy.Year, Mes = hoy.Month, Concepto = "Renta de tarima mediana", Cantidad = 15, Monto = 8004.00m },
+                    new Cargo { ClienteId = cliente.Id, Anio = hoy.Year, Mes = hoy.Month, Concepto = "Oficinas", Cantidad = 1, Monto = 4060.00m },
+                    new Cargo { ClienteId = cliente.Id, Anio = hoy.Year, Mes = hoy.Month, Concepto = "Crossdock - Tarima mediana", Cantidad = 8, Monto = 1856.00m }
+                );
+
+                db.Pagos.AddRange(
+                    new Pago { ClienteId = cliente.Id, Fecha = hoy.AddDays(-40), Monto = 10622.44m, MetodoPago = MetodoPago.Transferencia, Referencia = "TRX-001" },
+                    new Pago { ClienteId = cliente.Id, Fecha = hoy.AddDays(-25), Monto = 1450.00m, MetodoPago = MetodoPago.Efectivo },
+                    new Pago { ClienteId = cliente.Id, Fecha = hoy.AddDays(-10), Monto = 12683.44m, MetodoPago = MetodoPago.Transferencia, Referencia = "TRX-002" }
+                );
+                await db.SaveChangesAsync();
+            }
+        }
     }
 }

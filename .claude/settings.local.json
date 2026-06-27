@@ -24,7 +24,8 @@
       "mcp__Claude_Preview__preview_start",
       "PowerShell(Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"Servidor de prueba detenido.\")",
       "Bash(git add *)",
-      "Bash(git commit -q -m 'Modulo de Perfil: vista cliente solo lectura + edicion por administrador *)"
+      "Bash(git commit -q -m 'Modulo de Perfil: vista cliente solo lectura + edicion por administrador *)",
+      "Bash(git commit -q -m 'Modulo de Pagos y Facturacion *)"
     ]
   }
 }
