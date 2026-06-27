@@ -28,6 +28,10 @@ public class Producto
     [MaxLength(20)]
     public string UnidadMedida { get; set; } = "PZA";    // PZA, CAJA, KG, etc.
 
+    /// <summary>Ubicación física dentro del almacén (pasillo, rack, nivel, etc.).</summary>
+    [MaxLength(50)]
+    public string? Ubicacion { get; set; }
+
     /// <summary>Existencia actual en almacén.</summary>
     public int CantidadDisponible { get; set; }
 

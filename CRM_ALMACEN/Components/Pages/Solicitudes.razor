@@ -112,7 +112,7 @@
 
                     @if (mensaje is not null)
                     {
-                        <div class="alert alert-success mt-3 mb-0">@mensaje</div>
+                        <div class="alert @(envioError ? "alert-danger" : "alert-success") mt-3 mb-0">@mensaje</div>
                     }
                 </div>
             </div>
@@ -491,6 +491,7 @@ else
     }
     private string? mensaje;
     private string? errorAccion;
+    private bool envioError;
     private bool procesando;
 
     // Cobros (Cargos) por solicitud, tarifario por cliente y formularios de nuevo cobro.
@@ -730,8 +731,24 @@ else
     private async Task EnviarSolicitudAsync()
     {
         if (renglones.Count == 0 || clienteId is null) return;
+        envioError = false;
+        mensaje = null;
 
         await using var db = await DbFactory.CreateDbContextAsync();
+
+        // Validar que haya existencia suficiente antes de reservar.
+        foreach (var r in renglones)
+        {
+            var prod = await db.Productos.FindAsync(r.ProductoId);
+            if (prod is null || r.Cantidad > prod.CantidadDisponible)
+            {
+                envioError = true;
+                mensaje = $"No hay existencia suficiente de {prod?.Nombre ?? "un producto"}. " +
+                          $"Disponible: {prod?.CantidadDisponible ?? 0}.";
+                return;
+            }
+        }
+
         var solicitud = new SolicitudPedido
         {
             ClienteId = clienteId.Value,
@@ -748,7 +765,27 @@ else
         db.Solicitudes.Add(solicitud);
         await db.SaveChangesAsync();
 
-        mensaje = $"Solicitud enviada con {renglones.Count} producto(s).";
+        // Reservar la mercancía: se descuenta del almacén en cuanto se solicita
+        // y se registra la salida ligada al pedido. Si se cancela/rechaza, regresa.
+        foreach (var d in solicitud.Detalles)
+        {
+            var prod = await db.Productos.FindAsync(d.ProductoId);
+            if (prod is null) continue;
+            prod.CantidadDisponible -= d.Cantidad;
+            db.Salidas.Add(new Salida
+            {
+                ProductoId = d.ProductoId,
+                Cantidad = d.Cantidad,
+                Referencia = Folio(solicitud),
+                SolicitudPedidoId = solicitud.Id,
+                RegistradoPor = usuario,
+                Fecha = DateTime.Now
+            });
+        }
+        await db.SaveChangesAsync();
+
+        mensaje = $"Solicitud {Folio(solicitud)} enviada con {renglones.Count} producto(s). " +
+                  "La mercancía quedó apartada del almacén.";
         renglones.Clear();
         notas = null;
         await CargarAsync();
@@ -768,34 +805,11 @@ else
         }
 
         await using var db = await DbFactory.CreateDbContextAsync();
-        var solicitud = await db.Solicitudes.Include(s => s.Detalles).ThenInclude(d => d.Producto)
-            .FirstOrDefaultAsync(s => s.Id == solicitudId);
+        var solicitud = await db.Solicitudes.FindAsync(solicitudId);
         if (solicitud is null || solicitud.Estado != EstadoSolicitud.Pendiente) return;
 
-        // Validar existencia de todos los renglones
-        foreach (var d in solicitud.Detalles)
-        {
-            if (d.Producto is null || d.Cantidad > d.Producto.CantidadDisponible)
-            {
-                errorAccion = $"No se puede surtir: existencia insuficiente de {d.Producto?.Nombre}.";
-                return;
-            }
-        }
-
-        // Generar salidas y descontar
-        foreach (var d in solicitud.Detalles)
-        {
-            db.Salidas.Add(new Salida
-            {
-                ProductoId = d.ProductoId,
-                Cantidad = d.Cantidad,
-                Referencia = Folio(solicitud),
-                SolicitudPedidoId = solicitud.Id,
-                RegistradoPor = usuario,
-                Fecha = DateTime.Now
-            });
-            d.Producto!.CantidadDisponible -= d.Cantidad;
-        }
+        // La mercancía ya se descontó (apartó) al crear la solicitud; aquí solo
+        // se confirma el despacho cambiando el estado.
         solicitud.Estado = EstadoSolicitud.Surtida;
         solicitud.FechaAtencion = DateTime.Now;
         solicitud.AtendidoPor = usuario;
@@ -808,11 +822,24 @@ else
         await using var db = await DbFactory.CreateDbContextAsync();
         var solicitud = await db.Solicitudes.FindAsync(solicitudId);
         if (solicitud is null) return;
+        await DevolverReservaAsync(db, solicitudId);
         solicitud.Estado = EstadoSolicitud.Rechazada;
         solicitud.FechaAtencion = DateTime.Now;
         solicitud.AtendidoPor = usuario;
         await db.SaveChangesAsync();
         await CargarAsync();
+    }
+
+    /// <summary>Regresa al almacén la mercancía apartada por un pedido y borra sus salidas.</summary>
+    private static async Task DevolverReservaAsync(ApplicationDbContext db, int solicitudId)
+    {
+        var salidas = await db.Salidas.Where(x => x.SolicitudPedidoId == solicitudId).ToListAsync();
+        foreach (var sal in salidas)
+        {
+            var prod = await db.Productos.FindAsync(sal.ProductoId);
+            if (prod is not null) prod.CantidadDisponible += sal.Cantidad;
+        }
+        db.Salidas.RemoveRange(salidas);
     }
 
     private static string EstadoColor(EstadoSolicitud e) => e switch
@@ -862,6 +889,7 @@ else
             return;
         }
 
+        await DevolverReservaAsync(db, solicitudId);
         solicitud.Estado = EstadoSolicitud.Cancelada;
         solicitud.FechaAtencion = DateTime.Now;
         solicitud.AtendidoPor = usuario;

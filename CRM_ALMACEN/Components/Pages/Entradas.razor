@@ -56,7 +56,7 @@
             </EditForm>
             @if (mensaje is not null)
             {
-                <div class="alert alert-success mt-3 mb-0">@mensaje</div>
+                <div class="alert @(error ? "alert-danger" : "alert-success") mt-3 mb-0">@mensaje</div>
             }
         </div>
     </div>
@@ -74,25 +74,71 @@ else
                 <tr>
                     <th>Fecha</th>
                     <th>Producto</th>
+                    <th>Ubicación</th>
                     <th class="text-end">Cantidad</th>
                     <th>Referencia</th>
                     <th>Registró</th>
+                    @if (esAdmin)
+                    {
+                        <th class="text-end" style="width:200px">Acciones</th>
+                    }
                 </tr>
             </thead>
             <tbody>
                 @foreach (var e in entradas)
                 {
-                    <tr>
-                        <td>@e.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
-                        <td>@e.Producto?.Codigo — @e.Producto?.Nombre</td>
-                        <td class="text-end fw-bold text-success">+@e.Cantidad</td>
-                        <td>@e.Referencia</td>
-                        <td class="small text-muted">@e.RegistradoPor</td>
-                    </tr>
+                    var item = e;
+                    @if (esAdmin && editandoId == item.Id)
+                    {
+                        <tr>
+                            <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@item.Producto?.Codigo — @item.Producto?.Nombre</td>
+                            <td>@(string.IsNullOrWhiteSpace(item.Producto?.Ubicacion) ? "—" : item.Producto!.Ubicacion)</td>
+                            <td class="text-end">
+                                <input type="number" min="1" class="form-control form-control-sm text-end" @bind="editCantidad" style="max-width:90px;display:inline-block" />
+                            </td>
+                            <td><input class="form-control form-control-sm" @bind="editReferencia" /></td>
+                            <td class="small text-muted">@item.RegistradoPor</td>
+                            <td class="text-end">
+                                <div class="d-flex gap-2 justify-content-end">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => GuardarFilaAsync(item)" disabled="@guardando">
+                                        <span class="bi bi-check-lg"></span> Guardar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelarEdicion" disabled="@guardando">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@item.Producto?.Codigo — @item.Producto?.Nombre</td>
+                            <td>@(string.IsNullOrWhiteSpace(item.Producto?.Ubicacion) ? "—" : item.Producto!.Ubicacion)</td>
+                            <td class="text-end fw-bold text-success">+@item.Cantidad</td>
+                            <td>@item.Referencia</td>
+                            <td class="small text-muted">@item.RegistradoPor</td>
+                            @if (esAdmin)
+                            {
+                                <td class="text-end">
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => IniciarEdicion(item)" disabled="@guardando">
+                                            <span class="bi bi-pencil"></span> Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(item)" disabled="@guardando" title="Eliminar">
+                                            <span class="bi bi-trash"></span>
+                                        </button>
+                                    </div>
+                                </td>
+                            }
+                        </tr>
+                    }
                 }
                 @if (entradas.Count == 0)
                 {
-                    <tr><td colspan="5" class="text-center text-muted py-4">Sin entradas registradas.</td></tr>
+                    <tr><td colspan="@(esAdmin ? 7 : 6)" class="text-center text-muted py-4">Sin entradas registradas.</td></tr>
                 }
             </tbody>
         </table>
@@ -111,6 +157,11 @@ else
     private int? clienteId;
     private string? usuario;
     private string? mensaje;
+    private bool error;
+    private bool guardando;
+    private int? editandoId;
+    private int editCantidad;
+    private string? editReferencia;
 
     private IEnumerable<Producto> productosFiltrados =>
         productosDisponibles.Where(p => p.ClienteId == clienteSeleccionado);
@@ -175,6 +226,86 @@ else
         mensaje = $"Entrada registrada: +{nueva.Cantidad} de {producto.Nombre}.";
         nueva = new();
         await CargarAsync();
+    }
+
+    private void IniciarEdicion(Entrada e)
+    {
+        editandoId = e.Id;
+        editCantidad = e.Cantidad;
+        editReferencia = e.Referencia;
+    }
+
+    private void CancelarEdicion() => editandoId = null;
+
+    private async Task GuardarFilaAsync(Entrada e)
+    {
+        mensaje = null;
+        error = false;
+        if (editCantidad <= 0)
+        {
+            error = true;
+            mensaje = "La cantidad debe ser mayor a cero.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var entrada = await db.Entradas.FindAsync(e.Id);
+            if (entrada is null) return;
+            var producto = await db.Productos.FindAsync(entrada.ProductoId);
+            if (producto is null) return;
+
+            // La entrada suma existencia: más cantidad suma más, menos cantidad la resta.
+            var delta = editCantidad - entrada.Cantidad;
+            if (delta < 0 && (-delta) > producto.CantidadDisponible)
+            {
+                error = true;
+                mensaje = $"No se puede reducir tanto: la existencia actual es {producto.CantidadDisponible}.";
+                return;
+            }
+
+            producto.CantidadDisponible += delta;
+            entrada.Cantidad = editCantidad;
+            entrada.Referencia = editReferencia;
+            await db.SaveChangesAsync();
+
+            mensaje = "Entrada actualizada.";
+            editandoId = null;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
+    }
+
+    private async Task EliminarAsync(Entrada e)
+    {
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var entrada = await db.Entradas.FindAsync(e.Id);
+            if (entrada is null) return;
+            var producto = await db.Productos.FindAsync(entrada.ProductoId);
+            if (producto is not null)
+            {
+                if (entrada.Cantidad > producto.CantidadDisponible)
+                {
+                    error = true;
+                    mensaje = $"No se puede eliminar: ya se usó parte de esa mercancía (existencia actual: {producto.CantidadDisponible}).";
+                    return;
+                }
+                producto.CantidadDisponible -= entrada.Cantidad;
+            }
+            db.Entradas.Remove(entrada);
+            await db.SaveChangesAsync();
+
+            mensaje = $"Entrada eliminada. Se descontaron {e.Cantidad} de existencia.";
+            error = false;
+            editandoId = null;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
     }
 
     private sealed class NuevaEntrada

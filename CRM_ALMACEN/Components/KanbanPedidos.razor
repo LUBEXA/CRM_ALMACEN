@@ -214,8 +214,10 @@
     private bool procesandoPedido;
 
     /// <summary>True si el pedido ya descontó stock (fue despachado o entregado).</summary>
+    // La mercancía se aparta (descuenta) desde que el cliente solicita el pedido,
+    // así que está descontada en todos los estados vivos; solo regresa al rechazar/cancelar.
     private static bool StockDescontado(EstadoSolicitud e) =>
-        e is EstadoSolicitud.Surtida or EstadoSolicitud.Entregada;
+        e is not (EstadoSolicitud.Rechazada or EstadoSolicitud.Cancelada);
 
     private bool TieneCobros(SolicitudPedido s) =>
         cobrosCount.TryGetValue(s.Id, out var n) && n > 0;
@@ -304,39 +306,30 @@
 
         if (destino == EstadoSolicitud.Surtida)
         {
-            // Validar existencia
-            foreach (var d in solicitud.Detalles)
-            {
-                if (d.Producto is null || d.Cantidad > d.Producto.CantidadDisponible)
-                {
-                    esError = true;
-                    mensaje = $"No se puede despachar el pedido #{solicitud.Id}: existencia insuficiente de {d.Producto?.Nombre}.";
-                    return;
-                }
-            }
-            // Generar salidas y descontar
-            foreach (var d in solicitud.Detalles)
-            {
-                db.Salidas.Add(new Salida
-                {
-                    ProductoId = d.ProductoId,
-                    Cantidad = d.Cantidad,
-                    Referencia = $"Pedido #{solicitud.Id}",
-                    SolicitudPedidoId = solicitud.Id,
-                    RegistradoPor = usuario,
-                    Fecha = DateTime.Now
-                });
-                d.Producto!.CantidadDisponible -= d.Cantidad;
-            }
+            // La mercancía ya se apartó al crear el pedido; despachar solo cambia el estado.
             solicitud.Estado = EstadoSolicitud.Surtida;
             solicitud.FechaAtencion = DateTime.Now;
             solicitud.AtendidoPor = usuario;
             mensaje = $"Pedido #{solicitud.Id} despachado.";
         }
+        else if (destino == EstadoSolicitud.Rechazada || destino == EstadoSolicitud.Cancelada)
+        {
+            // Rechazar o cancelar devuelve al almacén la mercancía apartada.
+            var salidas = await db.Salidas.Where(x => x.SolicitudPedidoId == solicitud.Id).ToListAsync();
+            foreach (var sal in salidas)
+            {
+                var prod = await db.Productos.FindAsync(sal.ProductoId);
+                if (prod is not null) prod.CantidadDisponible += sal.Cantidad;
+            }
+            db.Salidas.RemoveRange(salidas);
+            solicitud.Estado = destino;
+            solicitud.FechaAtencion = DateTime.Now;
+            solicitud.AtendidoPor = usuario;
+        }
         else
         {
             solicitud.Estado = destino;
-            if (destino == EstadoSolicitud.Entregada || destino == EstadoSolicitud.Rechazada)
+            if (destino == EstadoSolicitud.Entregada)
             {
                 solicitud.FechaAtencion = DateTime.Now;
                 solicitud.AtendidoPor = usuario;

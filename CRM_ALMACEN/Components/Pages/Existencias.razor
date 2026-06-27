@@ -16,6 +16,11 @@
     </div>
 </div>
 
+@if (mensaje is not null)
+{
+    <div class="alert @(error ? "alert-danger" : "alert-success")">@mensaje</div>
+}
+
 @if (productos is null)
 {
     <p><em>Cargando...</em></p>
@@ -34,40 +39,85 @@ else
                     {
                         <th>Cliente</th>
                     }
+                    <th>Ubicación</th>
                     <th>Unidad</th>
                     <th class="text-end">Disponible</th>
-                    <th class="text-end">Mínimo</th>
                     <th>Estado</th>
+                    @if (esAdmin)
+                    {
+                        <th class="text-end" style="width:200px">Acciones</th>
+                    }
                 </tr>
             </thead>
             <tbody>
                 @foreach (var p in lista)
                 {
-                    <tr>
-                        <td><code>@p.Codigo</code></td>
-                        <td>@p.Nombre</td>
-                        @if (esAdmin)
-                        {
-                            <td>@p.Cliente?.Nombre</td>
-                        }
-                        <td>@p.UnidadMedida</td>
-                        <td class="text-end fw-bold">@p.CantidadDisponible</td>
-                        <td class="text-end">@p.StockMinimo</td>
-                        <td>
-                            @if (p.CantidadDisponible <= p.StockMinimo)
+                    var item = p;
+                    @if (esAdmin && editandoId == item.Id)
+                    {
+                        <tr>
+                            <td><code>@item.Codigo</code></td>
+                            <td>@item.Nombre</td>
+                            <td>@item.Cliente?.Nombre</td>
+                            <td><input class="form-control form-control-sm" @bind="item.Ubicacion" placeholder="Ej. Pasillo 3 / Rack B" /></td>
+                            <td><input class="form-control form-control-sm" @bind="item.UnidadMedida" style="max-width:90px" /></td>
+                            <td class="text-end">
+                                <input type="number" min="0" class="form-control form-control-sm text-end" @bind="item.CantidadDisponible" style="max-width:90px;display:inline-block" />
+                            </td>
+                            <td></td>
+                            <td class="text-end">
+                                <div class="d-flex gap-2 justify-content-end">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => GuardarFilaAsync(item)" disabled="@guardando">
+                                        <span class="bi bi-check-lg"></span> Guardar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelarEdicion" disabled="@guardando">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td><code>@item.Codigo</code></td>
+                            <td>@item.Nombre</td>
+                            @if (esAdmin)
                             {
-                                <span class="badge text-bg-danger">Bajo stock</span>
+                                <td>@item.Cliente?.Nombre</td>
                             }
-                            else
+                            <td>@(string.IsNullOrWhiteSpace(item.Ubicacion) ? "—" : item.Ubicacion)</td>
+                            <td>@item.UnidadMedida</td>
+                            <td class="text-end fw-bold">@item.CantidadDisponible</td>
+                            <td>
+                                @if (item.CantidadDisponible <= item.StockMinimo)
+                                {
+                                    <span class="badge text-bg-danger">Bajo stock</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-success">OK</span>
+                                }
+                            </td>
+                            @if (esAdmin)
                             {
-                                <span class="badge text-bg-success">OK</span>
+                                <td class="text-end">
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => editandoId = item.Id" disabled="@guardando">
+                                            <span class="bi bi-pencil"></span> Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(item)" disabled="@guardando" title="Eliminar">
+                                            <span class="bi bi-trash"></span>
+                                        </button>
+                                    </div>
+                                </td>
                             }
-                        </td>
-                    </tr>
+                        </tr>
+                    }
                 }
                 @if (lista.Count == 0)
                 {
-                    <tr><td colspan="@(esAdmin ? 7 : 6)" class="text-center text-muted py-4">Sin productos.</td></tr>
+                    <tr><td colspan="@(esAdmin ? 8 : 6)" class="text-center text-muted py-4">Sin productos.</td></tr>
                 }
             </tbody>
         </table>
@@ -80,20 +130,82 @@ else
 
     private List<Producto>? productos;
     private bool esAdmin;
+    private int? clienteId;
     private string filtro = "";
+    private int? editandoId;
+    private bool guardando;
+    private string? mensaje;
+    private bool error;
 
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthStateTask).User;
         esAdmin = user.EsAdmin();
-        var clienteId = user.ClienteId();
+        clienteId = user.ClienteId();
+        await CargarAsync();
+    }
 
+    private async Task CargarAsync()
+    {
         await using var db = await DbFactory.CreateDbContextAsync();
         var query = db.Productos.Include(p => p.Cliente).Where(p => p.Activo);
         if (clienteId is int id)
             query = query.Where(p => p.ClienteId == id);
 
         productos = await query.OrderBy(p => p.Nombre).ToListAsync();
+    }
+
+    private void CancelarEdicion()
+    {
+        editandoId = null;
+        _ = CargarAsync();
+    }
+
+    private async Task GuardarFilaAsync(Producto p)
+    {
+        mensaje = null;
+        error = false;
+        if (p.CantidadDisponible < 0)
+        {
+            error = true;
+            mensaje = "La existencia no puede ser negativa.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            p.Ubicacion = string.IsNullOrWhiteSpace(p.Ubicacion) ? null : p.Ubicacion.Trim();
+            p.UnidadMedida = string.IsNullOrWhiteSpace(p.UnidadMedida) ? "PZA" : p.UnidadMedida.Trim();
+            db.Productos.Update(p);
+            await db.SaveChangesAsync();
+            mensaje = "Cambios guardados.";
+            editandoId = null;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
+    }
+
+    private async Task EliminarAsync(Producto p)
+    {
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Productos.Remove(p);
+            await db.SaveChangesAsync();
+            mensaje = $"Producto '{p.Nombre}' eliminado.";
+            error = false;
+            editandoId = null;
+            await CargarAsync();
+        }
+        catch (DbUpdateException)
+        {
+            error = true;
+            mensaje = "No se puede eliminar: el producto tiene movimientos (entradas/salidas) registrados.";
+        }
+        finally { guardando = false; }
     }
 
     private IEnumerable<Producto> Filtrados()
