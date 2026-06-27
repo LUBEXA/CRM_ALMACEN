@@ -1,0 +1,165 @@
+@page "/clientes/editar/{Id:int}"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AlmacenamientoArchivos Almacenamiento
+@inject NavigationManager Navigation
+
+<PageTitle>Editar cliente - CRM Almacén</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <a href="clientes" class="btn btn-sm btn-outline-secondary"><span class="bi bi-arrow-left"></span> Volver</a>
+    <h1 class="mb-0">Editar cliente</h1>
+</div>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (cliente is null)
+{
+    <div class="alert alert-danger">Cliente no encontrado.</div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-4">
+                <h5 class="text-primary mb-0">Información general</h5>
+                @if (!string.IsNullOrEmpty(cliente.LogoArchivo))
+                {
+                    <img src="@cliente.LogoArchivo" alt="Logo" style="height:56px;width:auto;border:1px solid #e3e6ea;border-radius:8px;padding:3px;" />
+                }
+            </div>
+
+            <EditForm Model="cliente" OnValidSubmit="GuardarAsync" FormName="formClienteEditar">
+                <DataAnnotationsValidator />
+
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Nombre de la empresa</label>
+                        <InputText class="form-control" @bind-Value="cliente.Nombre" />
+                        <ValidationMessage For="() => cliente.Nombre" class="text-danger" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nombre del representante</label>
+                        <InputText class="form-control" @bind-Value="cliente.Representante" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Teléfono</label>
+                        <InputText class="form-control" @bind-Value="cliente.Telefono" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Correo electrónico</label>
+                        <InputText class="form-control" @bind-Value="cliente.Correo" />
+                        <ValidationMessage For="() => cliente.Correo" class="text-danger" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">2do teléfono</label>
+                        <InputText class="form-control" @bind-Value="cliente.Telefono2" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">2do correo electrónico</label>
+                        <InputText class="form-control" @bind-Value="cliente.Correo2" />
+                        <ValidationMessage For="() => cliente.Correo2" class="text-danger" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">RFC</label>
+                        <InputText class="form-control" @bind-Value="cliente.Rfc" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Dirección</label>
+                        <InputText class="form-control" @bind-Value="cliente.Direccion" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Constancia de Situación Fiscal (PDF)</label>
+                        <div class="d-flex align-items-center gap-2">
+                            @if (!string.IsNullOrEmpty(cliente.ConstanciaFiscalArchivo))
+                            {
+                                <a href="@cliente.ConstanciaFiscalArchivo" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                    <span class="bi bi-file-earmark-pdf"></span> Ver actual
+                                </a>
+                            }
+                            <InputFile OnChange="SubirConstancia" class="form-control form-control-sm" accept=".pdf" />
+                        </div>
+                        @if (subiendoConstancia) { <small class="text-muted">Subiendo...</small> }
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Logotipo de la empresa</label>
+                        <InputFile OnChange="SubirLogo" class="form-control form-control-sm" accept="image/*" />
+                        @if (subiendoLogo) { <small class="text-muted">Subiendo...</small> }
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch fs-5 bg-light p-3 rounded d-flex align-items-center">
+                            <InputCheckbox class="form-check-input me-2" @bind-Value="cliente.RequiereFactura" id="factura" style="margin-left:0" />
+                            <label class="form-check-label fs-6" for="factura">Requiere factura de CFDI de todos sus pagos</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="clientes" class="btn btn-outline-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary px-4">Guardar</button>
+                </div>
+
+                @if (mensaje is not null)
+                {
+                    <div class="alert alert-success mt-3 mb-0">@mensaje</div>
+                }
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Cliente? cliente;
+    private bool cargando = true;
+    private string? mensaje;
+    private bool subiendoLogo, subiendoConstancia;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        cliente = await db.Clientes.FindAsync(Id);
+        cargando = false;
+    }
+
+    private async Task SubirLogo(InputFileChangeEventArgs e)
+    {
+        if (cliente is null) return;
+        subiendoLogo = true;
+        try
+        {
+            cliente.LogoArchivo = await Almacenamiento.GuardarAsync(
+                e.File, $"clientes/{cliente.Id}", "logo", cliente.LogoArchivo);
+        }
+        finally { subiendoLogo = false; }
+    }
+
+    private async Task SubirConstancia(InputFileChangeEventArgs e)
+    {
+        if (cliente is null) return;
+        subiendoConstancia = true;
+        try
+        {
+            cliente.ConstanciaFiscalArchivo = await Almacenamiento.GuardarAsync(
+                e.File, $"clientes/{cliente.Id}", "constancia", cliente.ConstanciaFiscalArchivo);
+        }
+        finally { subiendoConstancia = false; }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (cliente is null) return;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Clientes.Update(cliente);
+        await db.SaveChangesAsync();
+        mensaje = "Datos guardados correctamente.";
+    }
+}

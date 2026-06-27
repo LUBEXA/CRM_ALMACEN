@@ -4,13 +4,13 @@
     {
       "name": "CRM_ALMACEN (HTTPS)",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "CRM_ALMACEN/CRM_ALMACEN", "--launch-profile", "https"],
+      "runtimeArgs": ["run", "--project", "C:/Users/memo_/source/repos/CRM_ALMACEN/CRM_ALMACEN/CRM_ALMACEN.csproj", "--launch-profile", "https"],
       "port": 7296
     },
     {
       "name": "CRM_ALMACEN (HTTP)",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "CRM_ALMACEN/CRM_ALMACEN", "--launch-profile", "http"],
+      "runtimeArgs": ["run", "--project", "C:/Users/memo_/source/repos/CRM_ALMACEN/CRM_ALMACEN/CRM_ALMACEN.csproj", "--launch-profile", "http"],
       "port": 5194
     }
   ]

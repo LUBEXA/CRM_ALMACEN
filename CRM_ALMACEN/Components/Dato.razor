@@ -1,0 +1,12 @@
+@* Muestra un par etiqueta/valor en modo solo lectura (medio renglón). *@
+<div class="col-md-6">
+    <div class="dato-label">@Titulo</div>
+    <div class="dato-valor @(string.IsNullOrWhiteSpace(Valor) ? "text-muted" : "")">
+        @(string.IsNullOrWhiteSpace(Valor) ? "—" : Valor)
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Titulo { get; set; } = "";
+    [Parameter] public string? Valor { get; set; }
+}

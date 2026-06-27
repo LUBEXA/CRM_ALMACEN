@@ -1,12 +1,22 @@
+:root {
+    --azul-marca: #1b3a6b;
+    --azul-marca-2: #16213e;
+    --azul-acento: #2d6cdf;
+}
+
 html, body {
     font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
-    background-color: #f5f6f8;
+    background-color: #eef1f5;
+    color: #2b2f36;
 }
 
 h1 {
-    font-size: 1.7rem;
+    font-size: 1.6rem;
     font-weight: 600;
+    color: #1f2937;
 }
+
+a, .btn-link { color: var(--azul-acento); }
 
 /* ---------- Layout general ---------- */
 .page {
@@ -15,57 +25,83 @@ h1 {
 }
 
 .sidebar {
-    width: 250px;
-    background: linear-gradient(180deg, #1b2a4a 0%, #16213e 100%);
+    width: 255px;
+    background: linear-gradient(180deg, var(--azul-marca) 0%, var(--azul-marca-2) 100%);
     color: #fff;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 main {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .top-row {
-    height: 56px;
+    height: 60px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     background: #fff;
     border-bottom: 1px solid #e3e6ea;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
 
 .content {
-    padding-top: 1.5rem;
-    padding-bottom: 2rem;
+    padding-top: 1.75rem;
+    padding-bottom: 2.5rem;
+}
+
+/* ---------- Marca / empresa en el menú ---------- */
+.sidebar-brand {
+    padding: 1.1rem 1.25rem 1rem;
+    background: rgba(0,0,0,.18);
+}
+
+.sidebar-brand .navbar-brand {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+}
+
+.sidebar-empresa {
+    margin-top: .6rem;
+    font-size: .85rem;
+    color: #aab8d4;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    max-width: 100%;
 }
 
 /* ---------- Menú lateral ---------- */
-.sidebar .navbar-brand {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: #fff;
-}
+.nav-scrollable { padding-top: .75rem; }
 
-.sidebar .top-row {
-    background: rgba(0,0,0,.25);
-    border-bottom: none;
-    justify-content: flex-start;
-}
-
-.nav-scrollable {
-    padding-top: .5rem;
+.nav-section {
+    text-transform: uppercase;
+    font-size: .7rem;
+    letter-spacing: .05em;
+    color: #7e8db0;
+    padding: 1rem 1.5rem .35rem;
 }
 
 .sidebar .nav-link {
     color: #cfd6e4;
-    border-radius: .375rem;
-    padding: .55rem .75rem;
-    margin: .1rem 0;
+    border-radius: .5rem;
+    padding: .6rem .8rem;
+    margin: .12rem .75rem;
     display: flex;
     align-items: center;
-    gap: .5rem;
+    gap: .65rem;
+    font-size: .95rem;
+    transition: background .15s, color .15s;
 }
+
+.sidebar .nav-link .bi { font-size: 1.05rem; }
 
 .sidebar .nav-link:hover {
     background: rgba(255,255,255,.08);
@@ -73,12 +109,100 @@ main {
 }
 
 .sidebar .nav-link.active {
-    background: #2d6cdf;
+    background: var(--azul-acento);
     color: #fff;
+    box-shadow: 0 3px 8px rgba(45,108,223,.35);
 }
 
-/* Ocultar el toggle del menú en escritorio */
 .navmenu-icon { display: none; }
+
+/* ---------- Barra superior ---------- */
+.top-row .usuario-info {
+    color: #6b7280;
+    font-size: .9rem;
+}
+
+/* ---------- Tarjetas ---------- */
+.card {
+    border: none;
+    border-radius: .85rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,.05);
+}
+
+.card-header {
+    background: #fff;
+    border-bottom: 1px solid #eef0f3;
+    font-weight: 600;
+    border-radius: .85rem .85rem 0 0 !important;
+}
+
+/* ---------- Formularios ---------- */
+.form-label {
+    font-weight: 500;
+    font-size: .9rem;
+    color: #4b5563;
+    margin-bottom: .3rem;
+}
+
+.form-control, .form-select {
+    border-radius: .6rem;
+    border-color: #d7dde6;
+    padding: .55rem .85rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--azul-acento);
+    box-shadow: 0 0 0 .2rem rgba(45,108,223,.15);
+}
+
+/* ---------- Datos en modo lectura ---------- */
+.dato-label {
+    font-size: .8rem;
+    color: #8a93a3;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    margin-bottom: .2rem;
+}
+
+.dato-valor {
+    font-size: 1.02rem;
+    color: #1f2937;
+    font-weight: 500;
+    padding-bottom: .4rem;
+    border-bottom: 1px solid #eef0f3;
+}
+
+/* ---------- Botones ---------- */
+.btn {
+    border-radius: .6rem;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background: var(--azul-acento);
+    border-color: var(--azul-acento);
+}
+
+.btn-primary:hover {
+    background: #1f5bc4;
+    border-color: #1f5bc4;
+}
+
+/* ---------- Tablas ---------- */
+.table {
+    background: #fff;
+    border-radius: .6rem;
+    overflow: hidden;
+}
+
+.table thead th {
+    background: #f6f8fb;
+    color: #4b5563;
+    font-size: .82rem;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    border-bottom: 2px solid #e9edf2;
+}
 
 /* ---------- Login ---------- */
 .login-wrapper {
@@ -86,7 +210,7 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #1b2a4a 0%, #2d6cdf 100%);
+    background: linear-gradient(135deg, var(--azul-marca) 0%, var(--azul-acento) 100%);
     padding: 1rem;
 }
 
@@ -99,19 +223,13 @@ main {
     max-width: 420px;
 }
 
-.login-title {
-    text-align: center;
-    font-weight: 700;
-    margin-bottom: .25rem;
-}
+.login-title { text-align: center; font-weight: 700; margin-bottom: .25rem; }
 
 /* ---------- Errores Blazor ---------- */
 #blazor-error-ui {
     display: none;
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: 0; left: 0; right: 0;
     background: #ffe6e6;
     border-top: 1px solid #f5a3a3;
     padding: .75rem 1.25rem;

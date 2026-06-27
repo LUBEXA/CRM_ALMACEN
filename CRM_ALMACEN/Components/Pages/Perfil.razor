@@ -1,0 +1,101 @@
+@page "/perfil"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Perfil - CRM Almacén</PageTitle>
+
+<h1>Perfil</h1>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (cliente is null)
+{
+    <div class="alert alert-info">
+        Esta sección es para los <strong>clientes</strong>. Tu cuenta es de administrador del almacén.
+        Para ver o editar los datos de un cliente, ve a la sección <a href="clientes">Clientes</a>.
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-4">
+                <h5 class="text-primary mb-0">Información general</h5>
+                @if (!string.IsNullOrEmpty(cliente.LogoArchivo))
+                {
+                    <img src="@cliente.LogoArchivo" alt="Logo" style="height:56px;width:auto;border:1px solid #e3e6ea;border-radius:8px;padding:3px;" />
+                }
+            </div>
+
+            <p class="text-muted small mb-4">
+                <span class="bi bi-info-circle"></span>
+                Esta información es administrada por el almacén. Si necesitas actualizar algún dato,
+                comunícate con tu administrador.
+            </p>
+
+            <div class="row g-4">
+                <Dato Titulo="Nombre de la empresa" Valor="@cliente.Nombre" />
+                <Dato Titulo="Nombre del representante" Valor="@cliente.Representante" />
+                <Dato Titulo="Teléfono" Valor="@cliente.Telefono" />
+                <Dato Titulo="Correo electrónico" Valor="@cliente.Correo" />
+                <Dato Titulo="2do teléfono" Valor="@cliente.Telefono2" />
+                <Dato Titulo="2do correo electrónico" Valor="@cliente.Correo2" />
+                <Dato Titulo="RFC" Valor="@cliente.Rfc" />
+                <Dato Titulo="Dirección" Valor="@cliente.Direccion" />
+
+                <div class="col-md-6">
+                    <div class="dato-label">Constancia de Situación Fiscal</div>
+                    @if (!string.IsNullOrEmpty(cliente.ConstanciaFiscalArchivo))
+                    {
+                        <a href="@cliente.ConstanciaFiscalArchivo" target="_blank" class="btn btn-sm btn-outline-secondary">
+                            <span class="bi bi-file-earmark-pdf"></span> Ver documento
+                        </a>
+                    }
+                    else
+                    {
+                        <div class="dato-valor text-muted">No registrada</div>
+                    }
+                </div>
+
+                <div class="col-md-6">
+                    <div class="dato-label">Factura CFDI</div>
+                    <div class="dato-valor">
+                        @if (cliente.RequiereFactura)
+                        {
+                            <span class="badge text-bg-success">Requiere factura de todos sus pagos</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">No requiere factura</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private Cliente? cliente;
+    private bool cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        var clienteId = user.ClienteId();
+
+        if (clienteId is int id)
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            cliente = await db.Clientes.FindAsync(id);
+        }
+        cargando = false;
+    }
+}

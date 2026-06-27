@@ -19,7 +19,12 @@
       "Bash(git commit -q -m 'Version inicial del CRM de Almacen \\(Blazor + SQL Server\\) *)",
       "Bash(git push *)",
       "Bash(ASPNETCORE_ENVIRONMENT=Development dotnet run --launch-profile http)",
-      "PowerShell(Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"App de prueba detenida.\")"
+      "PowerShell(Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"App de prueba detenida.\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 2; Write-Output \"Puerto liberado.\")",
+      "mcp__Claude_Preview__preview_start",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output \"Servidor de prueba detenido.\")",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Modulo de Perfil: vista cliente solo lectura + edicion por administrador *)"
     ]
   }
 }

@@ -41,6 +41,9 @@ builder.Services.AddScoped<ApplicationDbContext>(sp =>
 // SignInManager necesita acceso al HttpContext.
 builder.Services.AddHttpContextAccessor();
 
+// Servicio para guardar archivos subidos (logos, constancias).
+builder.Services.AddScoped<AlmacenamientoArchivos>();
+
 // --- Identity (usuarios y roles) ---
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
