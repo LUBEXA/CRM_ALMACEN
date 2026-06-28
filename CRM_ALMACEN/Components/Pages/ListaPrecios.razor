@@ -15,6 +15,29 @@
 
 @if (puedeEditar)
 {
+    <div class="mb-3">
+        @if (!mostrarFormulario)
+        {
+            <button class="btn btn-primary" @onclick="AbrirFormulario">
+                <span class="bi bi-plus-lg"></span> Agregar servicio
+            </button>
+        }
+        else
+        {
+            <button class="btn btn-outline-secondary" @onclick="CerrarFormulario">
+                <span class="bi bi-x-lg"></span> Cerrar formulario
+            </button>
+        }
+    </div>
+}
+
+@if (mensaje is not null)
+{
+    <div class="alert @(error ? "alert-danger" : "alert-success")">@mensaje</div>
+}
+
+@if (puedeEditar && mostrarFormulario)
+{
 <div class="card mb-4">
     <div class="card-header">Agregar servicio</div>
     <div class="card-body">
@@ -36,10 +59,6 @@
                 </button>
             </div>
         </div>
-        @if (mensaje is not null)
-        {
-            <div class="alert @(error ? "alert-danger" : "alert-success") mt-3 mb-0">@mensaje</div>
-        }
     </div>
 </div>
 }
@@ -120,6 +139,7 @@ else
     private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
 
     private bool puedeEditar;
+    private bool mostrarFormulario;
     private List<Servicio>? servicios;
     private string? nuevoNombre;
     private decimal nuevoImporte;
@@ -138,6 +158,24 @@ else
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         servicios = await db.Servicios.OrderBy(s => s.Nombre).ToListAsync();
+    }
+
+    private void AbrirFormulario()
+    {
+        mensaje = null;
+        error = false;
+        nuevoNombre = null;
+        nuevoImporte = 0;
+        mostrarFormulario = true;
+    }
+
+    private void CerrarFormulario()
+    {
+        mostrarFormulario = false;
+        nuevoNombre = null;
+        nuevoImporte = 0;
+        mensaje = null;
+        error = false;
     }
 
     private async Task AgregarAsync()
@@ -161,6 +199,7 @@ else
             mensaje = $"Servicio '{nombre}' agregado.";
             nuevoNombre = null;
             nuevoImporte = 0;
+            mostrarFormulario = false;
             await CargarAsync();
         }
         finally { guardando = false; }

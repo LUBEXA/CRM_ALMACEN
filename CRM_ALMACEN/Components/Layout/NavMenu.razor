@@ -48,6 +48,18 @@
                 </NavLink>
             </div>
         </AuthorizeView>
+        <AuthorizeView Policy="Ver:OcupacionAlmacen">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="ocupacion" title="Ocupación del almacén">
+                    <span class="bi bi-pie-chart-fill" aria-hidden="true"></span> <span class="link-text">Ocupación</span>
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="ubicaciones" title="Ubicaciones">
+                    <span class="bi bi-geo-alt-fill" aria-hidden="true"></span> <span class="link-text">Ubicaciones</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
         <AuthorizeView Policy="Ver:Entradas">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="entradas" title="Entradas">
@@ -66,6 +78,19 @@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="solicitudes" title="Solicitudes de pedido">
                     <span class="bi bi-card-checklist" aria-hidden="true"></span> <span class="link-text">Solicitudes de pedido</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="EsCliente">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="mis-movimientos" title="Movimientos de mi mercancía">
+                    <span class="bi bi-arrow-down-up" aria-hidden="true"></span> <span class="link-text">Movimientos</span>
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="mis-pedidos" title="Historial de pedidos">
+                    <span class="bi bi-clock-history" aria-hidden="true"></span> <span class="link-text">Historial de pedidos</span>
                 </NavLink>
             </div>
         </AuthorizeView>

@@ -39,7 +39,6 @@ else
                     {
                         <th>Cliente</th>
                     }
-                    <th>Ubicación</th>
                     <th>Unidad</th>
                     <th class="text-end">Disponible</th>
                     <th>Estado</th>
@@ -59,7 +58,6 @@ else
                             <td><code>@item.Codigo</code></td>
                             <td>@item.Nombre</td>
                             <td>@item.Cliente?.Nombre</td>
-                            <td><input class="form-control form-control-sm" @bind="item.Ubicacion" placeholder="Ej. Pasillo 3 / Rack B" /></td>
                             <td><input class="form-control form-control-sm" @bind="item.UnidadMedida" style="max-width:90px" /></td>
                             <td class="text-end">
                                 <input type="number" min="0" class="form-control form-control-sm text-end" @bind="item.CantidadDisponible" style="max-width:90px;display:inline-block" />
@@ -86,7 +84,6 @@ else
                             {
                                 <td>@item.Cliente?.Nombre</td>
                             }
-                            <td>@(string.IsNullOrWhiteSpace(item.Ubicacion) ? "—" : item.Ubicacion)</td>
                             <td>@item.UnidadMedida</td>
                             <td class="text-end fw-bold">@item.CantidadDisponible</td>
                             <td>
@@ -117,7 +114,7 @@ else
                 }
                 @if (lista.Count == 0)
                 {
-                    <tr><td colspan="@(6 + (esAdmin ? 1 : 0) + (puedeEditar ? 1 : 0))" class="text-center text-muted py-4">Sin productos.</td></tr>
+                    <tr><td colspan="@(5 + (esAdmin ? 1 : 0) + (puedeEditar ? 1 : 0))" class="text-center text-muted py-4">Sin productos.</td></tr>
                 }
             </tbody>
         </table>

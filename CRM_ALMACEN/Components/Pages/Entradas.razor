@@ -45,6 +45,20 @@
                         <label class="form-label">Referencia</label>
                         <InputText class="form-control" @bind-Value="nueva.Referencia" placeholder="Remisión / factura" />
                     </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Ubicación (rack)</label>
+                        <InputSelect class="form-select" @bind-Value="nueva.UbicacionId">
+                            <option value="">-- Sin asignar --</option>
+                            @foreach (var u in ubicaciones)
+                            {
+                                <option value="@u.Id">@u.Etiqueta</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Posiciones</label>
+                        <InputNumber class="form-control" @bind-Value="nueva.Posiciones" />
+                    </div>
                     <div class="col-12 col-md-3">
                         <button type="submit" class="btn btn-success w-100" disabled="@(clienteSeleccionado == 0)">Registrar</button>
                     </div>
@@ -95,7 +109,13 @@ else
                             <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
                             <td><code>@item.Producto?.Codigo</code></td>
                             <td>@item.Producto?.Nombre</td>
-                            <td>@(string.IsNullOrWhiteSpace(item.Producto?.Ubicacion) ? "—" : item.Producto!.Ubicacion)</td>
+                            <td>
+                                @if (item.Ubicacion is not null)
+                                {
+                                    <span>@item.Ubicacion.Etiqueta <span class="text-muted small">(@item.Posiciones pos.)</span></span>
+                                }
+                                else { <span>—</span> }
+                            </td>
                             <td class="text-end">
                                 <input type="number" min="1" class="form-control form-control-sm text-end" @bind="editCantidad" style="max-width:90px;display:inline-block" />
                             </td>
@@ -119,7 +139,13 @@ else
                             <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
                             <td><code>@item.Producto?.Codigo</code></td>
                             <td>@item.Producto?.Nombre</td>
-                            <td>@(string.IsNullOrWhiteSpace(item.Producto?.Ubicacion) ? "—" : item.Producto!.Ubicacion)</td>
+                            <td>
+                                @if (item.Ubicacion is not null)
+                                {
+                                    <span>@item.Ubicacion.Etiqueta <span class="text-muted small">(@item.Posiciones pos.)</span></span>
+                                }
+                                else { <span>—</span> }
+                            </td>
                             <td class="text-end fw-bold text-success">+@item.Cantidad</td>
                             <td>@item.Referencia</td>
                             <td class="small text-muted">@item.RegistradoPor</td>
@@ -155,6 +181,7 @@ else
     private List<Entrada>? entradas;
     private List<Producto> productosDisponibles = [];
     private List<Cliente> clientes = [];
+    private List<Ubicacion> ubicaciones = [];
     private int clienteSeleccionado;
     private bool puedeEditar;
     private int? clienteId;
@@ -190,7 +217,8 @@ else
     {
         await using var db = await DbFactory.CreateDbContextAsync();
 
-        var query = db.Entradas.Include(e => e.Producto).ThenInclude(p => p!.Cliente).AsQueryable();
+        var query = db.Entradas.Include(e => e.Producto).ThenInclude(p => p!.Cliente)
+            .Include(e => e.Ubicacion).AsQueryable();
         if (clienteId is int id)
             query = query.Where(e => e.Producto!.ClienteId == id);
 
@@ -201,6 +229,8 @@ else
             productosDisponibles = await db.Productos.Include(p => p.Cliente)
                 .Where(p => p.Activo).OrderBy(p => p.Nombre).ToListAsync();
             clientes = await db.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+            ubicaciones = await db.Ubicaciones.Where(u => u.Activo)
+                .OrderBy(u => u.Zona).ThenBy(u => u.Codigo).ToListAsync();
         }
     }
 
@@ -218,6 +248,8 @@ else
         {
             ProductoId = producto.Id,
             Cantidad = nueva.Cantidad,
+            UbicacionId = nueva.UbicacionId,
+            Posiciones = nueva.UbicacionId is null ? 0 : Math.Max(1, nueva.Posiciones),
             Referencia = nueva.Referencia,
             Observaciones = nueva.Observaciones,
             RegistradoPor = usuario,
@@ -316,6 +348,8 @@ else
         public int ProductoId { get; set; }
         [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue, ErrorMessage = "Cantidad debe ser mayor a 0.")]
         public int Cantidad { get; set; } = 1;
+        public int? UbicacionId { get; set; }
+        public int Posiciones { get; set; } = 1;
         public string? Referencia { get; set; }
         public string? Observaciones { get; set; }
     }

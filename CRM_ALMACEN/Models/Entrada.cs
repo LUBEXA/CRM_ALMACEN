@@ -15,6 +15,13 @@ public class Entrada
     [Range(1, int.MaxValue, ErrorMessage = "La cantidad debe ser mayor a cero.")]
     public int Cantidad { get; set; }
 
+    /// <summary>Rack/posición del almacén donde se colocó esta mercancía.</summary>
+    public int? UbicacionId { get; set; }
+    public Ubicacion? Ubicacion { get; set; }
+
+    /// <summary>Cuántas posiciones/tarimas ocupa esta entrada en el rack (mín. 1).</summary>
+    public int Posiciones { get; set; } = 1;
+
     public DateTime Fecha { get; set; } = DateTime.Now;
 
     [MaxLength(80)]

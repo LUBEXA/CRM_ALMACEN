@@ -1,0 +1,153 @@
+@page "/mis-pedidos"
+@attribute [Authorize(Policy = "EsCliente")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Historial de pedidos - CRM Almacén</PageTitle>
+
+<h1>📋 Historial de pedidos</h1>
+<p class="text-muted">Todos tus pedidos y su estado. Para crear un pedido nuevo usa <a href="solicitudes">Solicitudes de pedido</a>.</p>
+
+@if (pedidos is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <select class="form-select form-select-sm" style="max-width:200px" @bind="filtroEstado">
+            <option value="-1">Todos los estados</option>
+            @foreach (var e in Enum.GetValues<EstadoSolicitud>())
+            {
+                <option value="@((int)e)">@EstadoTexto(e)</option>
+            }
+        </select>
+        <input class="form-control form-control-sm" style="max-width:260px" placeholder="Buscar por folio (Ej. SOL-00012)" @bind="busqueda" />
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Folio</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th class="text-end">Productos</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Filtrados)
+                {
+                    var item = p;
+                    <tr>
+                        <td><span class="badge text-bg-dark font-monospace">@Folio(item.Id)</span></td>
+                        <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td><span class="badge @EstadoColor(item.Estado)">@EstadoTexto(item.Estado)</span></td>
+                        <td class="text-end">@item.Detalles.Count</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Toggle(item.Id)">
+                                @(abiertos.Contains(item.Id) ? "Ocultar" : "Ver detalle")
+                            </button>
+                        </td>
+                    </tr>
+                    @if (abiertos.Contains(item.Id))
+                    {
+                        <tr>
+                            <td colspan="5" class="bg-body-tertiary">
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr><th>Código</th><th>Producto</th><th class="text-end">Cantidad</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var d in item.Detalles)
+                                        {
+                                            <tr>
+                                                <td><code>@d.Producto?.Codigo</code></td>
+                                                <td>@d.Producto?.Nombre</td>
+                                                <td class="text-end">@d.Cantidad</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                                @if (!string.IsNullOrWhiteSpace(item.Notas))
+                                {
+                                    <p class="small text-muted mt-2 mb-0"><strong>Notas:</strong> @item.Notas</p>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                @if (Filtrados.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">Sin pedidos.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private List<SolicitudPedido>? pedidos;
+    private int? clienteId;
+    private int filtroEstado = -1;
+    private string busqueda = "";
+    private readonly HashSet<int> abiertos = new();
+
+    private static string Folio(int id) => $"SOL-{id:00000}";
+
+    private List<SolicitudPedido> Filtrados => (pedidos ?? [])
+        .Where(p => filtroEstado == -1 || (int)p.Estado == filtroEstado)
+        .Where(p => string.IsNullOrWhiteSpace(busqueda)
+            || Folio(p.Id).Contains(busqueda.Trim(), StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        clienteId = (await AuthStateTask).User.ClienteId();
+        await CargarAsync();
+    }
+
+    private void Toggle(int id)
+    {
+        if (!abiertos.Remove(id)) abiertos.Add(id);
+    }
+
+    private async Task CargarAsync()
+    {
+        if (clienteId is not int id) { pedidos = []; return; }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        pedidos = await db.Solicitudes
+            .Include(s => s.Detalles).ThenInclude(d => d.Producto)
+            .Where(s => s.ClienteId == id)
+            .OrderByDescending(s => s.Fecha)
+            .ToListAsync();
+    }
+
+    private static string EstadoColor(EstadoSolicitud e) => e switch
+    {
+        EstadoSolicitud.Pendiente => "text-bg-warning",
+        EstadoSolicitud.Aprobada => "text-bg-info",
+        EstadoSolicitud.Surtida => "text-bg-success",
+        EstadoSolicitud.Entregada => "text-bg-success",
+        EstadoSolicitud.Rechazada => "text-bg-danger",
+        EstadoSolicitud.Cancelada => "text-bg-secondary",
+        _ => "text-bg-secondary"
+    };
+
+    private static string EstadoTexto(EstadoSolicitud e) => e switch
+    {
+        EstadoSolicitud.Pendiente => "Pendiente",
+        EstadoSolicitud.Aprobada => "Aprobada",
+        EstadoSolicitud.Surtida => "Surtida",
+        EstadoSolicitud.Entregada => "Entregada",
+        EstadoSolicitud.Rechazada => "Rechazada",
+        EstadoSolicitud.Cancelada => "Cancelada",
+        _ => e.ToString()
+    };
+}

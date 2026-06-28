@@ -27,7 +27,6 @@ else
                     <th>Fecha</th>
                     <th>Código</th>
                     <th>Producto</th>
-                    <th>Ubicación</th>
                     <th class="text-end">Cantidad</th>
                     <th>Referencia</th>
                     <th>Registró</th>
@@ -47,7 +46,6 @@ else
                             <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
                             <td><code>@item.Producto?.Codigo</code></td>
                             <td>@item.Producto?.Nombre</td>
-                            <td>@(string.IsNullOrWhiteSpace(item.Producto?.Ubicacion) ? "—" : item.Producto!.Ubicacion)</td>
                             <td class="text-end">
                                 <input type="number" min="1" class="form-control form-control-sm text-end" @bind="editCantidad" style="max-width:90px;display:inline-block" />
                             </td>
@@ -71,7 +69,6 @@ else
                             <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
                             <td><code>@item.Producto?.Codigo</code></td>
                             <td>@item.Producto?.Nombre</td>
-                            <td>@(string.IsNullOrWhiteSpace(item.Producto?.Ubicacion) ? "—" : item.Producto!.Ubicacion)</td>
                             <td class="text-end fw-bold text-danger">-@item.Cantidad</td>
                             <td>@item.Referencia</td>
                             <td class="small text-muted">@item.RegistradoPor</td>
@@ -93,7 +90,7 @@ else
                 }
                 @if (salidas.Count == 0)
                 {
-                    <tr><td colspan="@(puedeEditar ? 8 : 7)" class="text-center text-muted py-4">Sin salidas registradas.</td></tr>
+                    <tr><td colspan="@(puedeEditar ? 7 : 6)" class="text-center text-muted py-4">Sin salidas registradas.</td></tr>
                 }
             </tbody>
         </table>

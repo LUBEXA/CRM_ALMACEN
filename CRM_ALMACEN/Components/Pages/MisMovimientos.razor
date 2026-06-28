@@ -1,0 +1,120 @@
+@page "/mis-movimientos"
+@attribute [Authorize(Policy = "EsCliente")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Movimientos - CRM Almacén</PageTitle>
+
+<h1>🔄 Movimientos de mi mercancía</h1>
+<p class="text-muted">Historial de entradas (mercancía que llegó al almacén) y salidas (mercancía entregada) de tus productos.</p>
+
+@if (movimientos is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <select class="form-select form-select-sm" style="max-width:200px" @bind="filtroTipo" @bind:after="Aplicar">
+            <option value="">Todos los movimientos</option>
+            <option value="entrada">Solo entradas</option>
+            <option value="salida">Solo salidas</option>
+        </select>
+        <input class="form-control form-control-sm" style="max-width:280px" placeholder="Buscar por código, producto o referencia" @bind="busqueda" @bind:after="Aplicar" />
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Código</th>
+                    <th>Producto</th>
+                    <th class="text-end">Cantidad</th>
+                    <th>Referencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Filtrados)
+                {
+                    <tr>
+                        <td>@m.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            @if (m.EsEntrada)
+                            {
+                                <span class="badge text-bg-success"><span class="bi bi-arrow-down-circle"></span> Entrada</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-danger"><span class="bi bi-arrow-up-circle"></span> Salida</span>
+                            }
+                        </td>
+                        <td><code>@m.Codigo</code></td>
+                        <td>@m.Producto</td>
+                        <td class="text-end fw-bold @(m.EsEntrada ? "text-success" : "text-danger")">
+                            @(m.EsEntrada ? "+" : "-")@m.Cantidad
+                        </td>
+                        <td>@m.Referencia</td>
+                    </tr>
+                }
+                @if (Filtrados.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">Sin movimientos.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private record Movimiento(bool EsEntrada, DateTime Fecha, string? Codigo, string? Producto, int Cantidad, string? Referencia);
+
+    private List<Movimiento>? movimientos;
+    private int? clienteId;
+    private string filtroTipo = "";
+    private string busqueda = "";
+
+    private List<Movimiento> Filtrados => (movimientos ?? [])
+        .Where(m => filtroTipo == "" || (filtroTipo == "entrada" && m.EsEntrada) || (filtroTipo == "salida" && !m.EsEntrada))
+        .Where(m => string.IsNullOrWhiteSpace(busqueda)
+            || (m.Codigo?.Contains(busqueda, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (m.Producto?.Contains(busqueda, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (m.Referencia?.Contains(busqueda, StringComparison.OrdinalIgnoreCase) ?? false))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        clienteId = (await AuthStateTask).User.ClienteId();
+        await CargarAsync();
+    }
+
+    private void Aplicar() { /* el filtro es en memoria; sólo re-renderiza */ }
+
+    private async Task CargarAsync()
+    {
+        if (clienteId is not int id) { movimientos = []; return; }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var entradas = await db.Entradas
+            .Include(e => e.Producto)
+            .Where(e => e.Producto!.ClienteId == id)
+            .OrderByDescending(e => e.Fecha).Take(200)
+            .Select(e => new Movimiento(true, e.Fecha, e.Producto!.Codigo, e.Producto.Nombre, e.Cantidad, e.Referencia))
+            .ToListAsync();
+
+        var salidas = await db.Salidas
+            .Include(s => s.Producto)
+            .Where(s => s.Producto!.ClienteId == id)
+            .OrderByDescending(s => s.Fecha).Take(200)
+            .Select(s => new Movimiento(false, s.Fecha, s.Producto!.Codigo, s.Producto.Nombre, s.Cantidad, s.Referencia))
+            .ToListAsync();
+
+        movimientos = entradas.Concat(salidas).OrderByDescending(m => m.Fecha).ToList();
+    }
+}

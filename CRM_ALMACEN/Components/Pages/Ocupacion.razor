@@ -1,0 +1,236 @@
+@page "/ocupacion"
+@attribute [Authorize(Policy = "Ver:OcupacionAlmacen")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Ocupación del almacén - CRM Almacén</PageTitle>
+
+<h1>📊 Ocupación del almacén</h1>
+<p class="text-muted">¿Cuánto espacio te queda? Capacidad total contra lo que ya está ocupado, en tiempo real.</p>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (capacidadTotal == 0)
+{
+    <div class="alert alert-warning">
+        Todavía no has definido ubicaciones con cupo. Ve a
+        <a href="ubicaciones" class="alert-link">Ubicaciones</a> y da de alta tus pasillos/racks
+        para poder medir la ocupación.
+    </div>
+}
+else
+{
+    var pct = capacidadTotal == 0 ? 0 : (double)ocupadoTotal / capacidadTotal * 100;
+    var color = pct >= 90 ? "var(--bs-danger)" : pct >= 70 ? "var(--bs-warning)" : "var(--bs-success)";
+    var circ = 2 * Math.PI * 70;
+    var llenoArco = circ * pct / 100;
+
+    <div class="row g-4 mb-2">
+        @* ---- Dona ---- *@
+        <div class="col-md-5 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-muted mb-3">Capacidad utilizada</h6>
+                    <svg viewBox="0 0 180 180" style="max-width:220px;width:100%">
+                        <circle cx="90" cy="90" r="70" fill="none" stroke="var(--bs-gray-300)" stroke-width="22" />
+                        <circle cx="90" cy="90" r="70" fill="none" stroke="@color" stroke-width="22"
+                                stroke-dasharray="@llenoArco.ToString(System.Globalization.CultureInfo.InvariantCulture) @circ.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                stroke-linecap="round" transform="rotate(-90 90 90)" />
+                        <text x="90" y="84" text-anchor="middle" font-size="34" font-weight="700" fill="@color">@pct.ToString("0")%</text>
+                        <text x="90" y="108" text-anchor="middle" font-size="13" fill="var(--bs-secondary-color)">ocupado</text>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        @* ---- Tarjetas resumen ---- *@
+        <div class="col-md-7 col-lg-8">
+            <div class="row g-3 h-100">
+                <div class="col-sm-4">
+                    <div class="card text-bg-primary h-100"><div class="card-body">
+                        <h6 class="card-title">Capacidad total</h6>
+                        <p class="display-6 mb-0">@capacidadTotal</p>
+                        <small>espacios</small>
+                    </div></div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="card text-bg-secondary h-100"><div class="card-body">
+                        <h6 class="card-title">Ocupado</h6>
+                        <p class="display-6 mb-0">@ocupadoTotal</p>
+                        <small>espacios</small>
+                    </div></div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="card text-bg-success h-100"><div class="card-body">
+                        <h6 class="card-title">Disponible</h6>
+                        <p class="display-6 mb-0">@(capacidadTotal - ocupadoTotal)</p>
+                        <small>espacios</small>
+                    </div></div>
+                </div>
+                <div class="col-12">
+                    <div class="alert @(pct >= 90 ? "alert-danger" : pct >= 70 ? "alert-warning" : "alert-success") mb-0">
+                        @if (pct >= 90)
+                        {
+                            <span><span class="bi bi-exclamation-triangle-fill"></span> Almacén casi lleno. Quedan @ubicacionesLibres.Count posición(es) libre(s).</span>
+                        }
+                        else if (pct >= 70)
+                        {
+                            <span><span class="bi bi-exclamation-circle"></span> Capacidad alta. @ubicacionesLibres.Count posición(es) libre(s) disponibles.</span>
+                        }
+                        else
+                        {
+                            <span><span class="bi bi-check-circle"></span> Tienes espacio de sobra: @ubicacionesLibres.Count posición(es) libre(s).</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ---- Ocupación por zona ---- *@
+    <h4 class="mt-4">Ocupación por zona</h4>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr><th>Zona / Pasillo</th><th style="width:40%">Ocupación</th><th class="text-end">Ocupado</th><th class="text-end">Cupo</th><th class="text-end">Libre</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var z in porZona)
+                {
+                    var zpct = z.Capacidad == 0 ? 0 : (double)z.Ocupado / z.Capacidad * 100;
+                    var zcolor = zpct >= 90 ? "bg-danger" : zpct >= 70 ? "bg-warning" : "bg-success";
+                    <tr>
+                        <td>@z.Zona</td>
+                        <td>
+                            <div class="progress" style="height:18px">
+                                <div class="progress-bar @zcolor" style="width:@zpct.ToString("0", System.Globalization.CultureInfo.InvariantCulture)%">@zpct.ToString("0")%</div>
+                            </div>
+                        </td>
+                        <td class="text-end">@z.Ocupado</td>
+                        <td class="text-end">@z.Capacidad</td>
+                        <td class="text-end fw-bold">@(z.Capacidad - z.Ocupado)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @* ---- Posiciones libres ---- *@
+    <h4 class="mt-4">Posiciones libres <span class="badge text-bg-success">@ubicacionesLibres.Count</span></h4>
+    <p class="text-muted small">Espacios con cupo disponible para asignar a un cliente nuevo.</p>
+    @if (ubicacionesLibres.Count == 0)
+    {
+        <div class="alert alert-secondary">No hay posiciones libres en este momento.</div>
+    }
+    else
+    {
+        <div class="row g-2 mb-4">
+            @foreach (var u in ubicacionesLibres)
+            {
+                var libre = u.Capacidad - ocupacionPorUbicacion.GetValueOrDefault(u.Id, 0);
+                <div class="col-auto">
+                    <span class="badge text-bg-light border p-2">
+                        <span class="bi bi-geo-alt text-success"></span> @u.Etiqueta
+                        <span class="text-muted">· @libre libre(s)</span>
+                    </span>
+                </div>
+            }
+        </div>
+    }
+
+    @* ---- Detalle por ubicación ---- *@
+    <h4 class="mt-4">Detalle por ubicación</h4>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr><th>Zona</th><th>Código</th><th class="text-end">Ocupado</th><th class="text-end">Cupo</th><th>Estado</th><th>Cliente(s)</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var u in ubicaciones)
+                {
+                    var ocup = ocupacionPorUbicacion.GetValueOrDefault(u.Id, 0);
+                    var clientes = clientesPorUbicacion.GetValueOrDefault(u.Id);
+                    <tr>
+                        <td>@(string.IsNullOrWhiteSpace(u.Zona) ? "—" : u.Zona)</td>
+                        <td><code>@u.Codigo</code></td>
+                        <td class="text-end">@ocup</td>
+                        <td class="text-end">@u.Capacidad</td>
+                        <td>
+                            @if (ocup >= u.Capacidad)
+                            {
+                                <span class="badge text-bg-danger">Lleno</span>
+                            }
+                            else if (ocup == 0)
+                            {
+                                <span class="badge text-bg-success">Libre</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-warning">Parcial</span>
+                            }
+                        </td>
+                        <td class="text-muted small">@(string.IsNullOrWhiteSpace(clientes) ? "—" : clientes)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private bool cargando = true;
+    private int capacidadTotal, ocupadoTotal;
+    private List<Ubicacion> ubicaciones = new();
+    private List<Ubicacion> ubicacionesLibres = new();
+    private Dictionary<int, int> ocupacionPorUbicacion = new();
+    private Dictionary<int, string> clientesPorUbicacion = new();
+    private List<ZonaResumen> porZona = new();
+
+    private record ZonaResumen(string Zona, int Ocupado, int Capacidad);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        ubicaciones = await db.Ubicaciones.Where(u => u.Activo)
+            .OrderBy(u => u.Zona).ThenBy(u => u.Codigo).ToListAsync();
+
+        // La mercancía ocupa el rack mientras el producto tenga existencia.
+        // Cada entrada aporta sus posiciones; cuando el producto se agota, se libera solo.
+        var colocaciones = await db.Entradas
+            .Where(e => e.UbicacionId != null && e.Producto!.Activo && e.Producto.CantidadDisponible > 0)
+            .Select(e => new { Ubic = e.UbicacionId!.Value, e.Posiciones, Cliente = e.Producto!.Cliente!.Nombre })
+            .ToListAsync();
+
+        ocupacionPorUbicacion = colocaciones
+            .GroupBy(a => a.Ubic)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Posiciones));
+
+        clientesPorUbicacion = colocaciones
+            .GroupBy(a => a.Ubic)
+            .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(x => x.Cliente).Distinct()));
+
+        capacidadTotal = ubicaciones.Sum(u => u.Capacidad);
+        // Ocupado efectivo: no contar más de lo que cabe en cada posición
+        ocupadoTotal = ubicaciones.Sum(u =>
+            Math.Min(u.Capacidad, ocupacionPorUbicacion.GetValueOrDefault(u.Id, 0)));
+
+        ubicacionesLibres = ubicaciones
+            .Where(u => ocupacionPorUbicacion.GetValueOrDefault(u.Id, 0) < u.Capacidad)
+            .ToList();
+
+        porZona = ubicaciones
+            .GroupBy(u => string.IsNullOrWhiteSpace(u.Zona) ? "Sin zona" : u.Zona!)
+            .Select(g => new ZonaResumen(
+                g.Key,
+                g.Sum(u => Math.Min(u.Capacidad, ocupacionPorUbicacion.GetValueOrDefault(u.Id, 0))),
+                g.Sum(u => u.Capacidad)))
+            .OrderBy(z => z.Zona)
+            .ToList();
+
+        cargando = false;
+    }
+}

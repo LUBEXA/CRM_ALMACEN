@@ -1,0 +1,325 @@
+@page "/ubicaciones"
+@attribute [Authorize(Policy = "Ver:OcupacionAlmacen")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Ubicaciones - CRM Almacén</PageTitle>
+
+<h1>🗺️ Ubicaciones del almacén</h1>
+<p class="text-muted">
+    Da de alta tus pasillos, racks o posiciones con el cupo de cada uno. Esto permite
+    saber cuánto espacio tienes disponible en el <a href="ocupacion">reporte de ocupación</a>.
+</p>
+
+@if (puedeEditar)
+{
+    <div class="mb-3">
+        @if (!mostrarFormulario)
+        {
+            <button class="btn btn-primary" @onclick="AbrirFormulario">
+                <span class="bi bi-plus-lg"></span> Agregar ubicación
+            </button>
+        }
+        else
+        {
+            <button class="btn btn-outline-secondary" @onclick="CerrarFormulario">
+                <span class="bi bi-x-lg"></span> Cerrar formulario
+            </button>
+        }
+    </div>
+}
+
+@if (mensaje is not null)
+{
+    <div class="alert @(error ? "alert-danger" : "alert-success")">@mensaje</div>
+}
+
+@if (puedeEditar && mostrarFormulario)
+{
+<div class="card mb-4">
+    <div class="card-header">Agregar ubicación</div>
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Zona / Pasillo</label>
+                <input class="form-control" @bind="nuevaZona" placeholder="Ej. Pasillo 3" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Código de posición</label>
+                <input class="form-control" @bind="nuevoCodigo" placeholder="Ej. P3-RB-N2" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Cupo (tarimas/productos)</label>
+                <input type="number" min="1" class="form-control" @bind="nuevaCapacidad" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Notas</label>
+                <input class="form-control" @bind="nuevasNotas" placeholder="Opcional" />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" @onclick="AgregarAsync" disabled="@guardando">
+                    <span class="bi bi-plus-lg"></span> Agregar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@if (ubicaciones is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <p class="text-muted small">@ubicaciones.Count ubicación(es)</p>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Zona / Pasillo</th>
+                    <th>Código</th>
+                    <th class="text-end">Cupo</th>
+                    <th class="text-end">Ocupado</th>
+                    <th>Notas</th>
+                    <th>Estado</th>
+                    @if (puedeEditar) { <th class="text-end" style="width:170px"></th> }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in ubicaciones)
+                {
+                    var item = u;
+                    var ocupado = ocupacionPorUbicacion.GetValueOrDefault(item.Id, 0);
+                    @if (puedeEditar && editandoId == item.Id)
+                    {
+                        <tr>
+                            <td><input class="form-control form-control-sm" @bind="item.Zona" /></td>
+                            <td><input class="form-control form-control-sm" @bind="item.Codigo" /></td>
+                            <td><input type="number" min="1" class="form-control form-control-sm text-end" @bind="item.Capacidad" style="max-width:90px" /></td>
+                            <td class="text-end">@ocupado</td>
+                            <td><input class="form-control form-control-sm" @bind="item.Notas" /></td>
+                            <td>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" @bind="item.Activo" />
+                                    <label class="form-check-label small">@(item.Activo ? "Activa" : "Inactiva")</label>
+                                </div>
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-primary" @onclick="() => GuardarFilaAsync(item)" disabled="@guardando">
+                                    <span class="bi bi-check-lg"></span> Guardar
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelarEdicion" disabled="@guardando">Cancelar</button>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td>@(string.IsNullOrWhiteSpace(item.Zona) ? "—" : item.Zona)</td>
+                            <td><code>@item.Codigo</code></td>
+                            <td class="text-end">@item.Capacidad</td>
+                            <td class="text-end">
+                                @ocupado
+                                @if (ocupado >= item.Capacidad)
+                                {
+                                    <span class="badge text-bg-danger ms-1">Lleno</span>
+                                }
+                                else if (ocupado == 0)
+                                {
+                                    <span class="badge text-bg-success ms-1">Libre</span>
+                                }
+                            </td>
+                            <td class="text-muted small">@item.Notas</td>
+                            <td>
+                                @if (item.Activo)
+                                {
+                                    <span class="badge text-bg-success">Activa</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary">Inactiva</span>
+                                }
+                            </td>
+                            @if (puedeEditar)
+                            {
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => editandoId = item.Id" disabled="@guardando">
+                                        <span class="bi bi-pencil"></span> Editar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(item)" disabled="@guardando" title="Eliminar">
+                                        <span class="bi bi-trash"></span>
+                                    </button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+                @if (ubicaciones.Count == 0)
+                {
+                    <tr><td colspan="@(puedeEditar ? 7 : 6)" class="text-center text-muted py-4">Todavía no hay ubicaciones. Agrega la primera arriba.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private bool puedeEditar;
+    private bool mostrarFormulario;
+    private List<Ubicacion>? ubicaciones;
+    private Dictionary<int, int> ocupacionPorUbicacion = new();
+    private string? nuevaZona, nuevoCodigo, nuevasNotas;
+    private int nuevaCapacidad = 1;
+    private int? editandoId;
+    private string? mensaje;
+    private bool error;
+    private bool guardando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        puedeEditar = user.PuedeEditarModulo(ModuloApp.Inventario);
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        ubicaciones = await db.Ubicaciones.OrderBy(u => u.Zona).ThenBy(u => u.Codigo).ToListAsync();
+        ocupacionPorUbicacion = await db.Entradas
+            .Where(e => e.UbicacionId != null && e.Producto!.Activo && e.Producto.CantidadDisponible > 0)
+            .GroupBy(e => e.UbicacionId!.Value)
+            .Select(g => new { g.Key, Total = g.Sum(e => e.Posiciones) })
+            .ToDictionaryAsync(x => x.Key, x => x.Total);
+    }
+
+    private void AbrirFormulario()
+    {
+        mensaje = null;
+        error = false;
+        nuevaZona = nuevoCodigo = nuevasNotas = null;
+        nuevaCapacidad = 1;
+        mostrarFormulario = true;
+    }
+
+    private void CerrarFormulario()
+    {
+        mostrarFormulario = false;
+        nuevaZona = nuevoCodigo = nuevasNotas = null;
+        nuevaCapacidad = 1;
+        mensaje = null;
+        error = false;
+    }
+
+    private void CancelarEdicion()
+    {
+        editandoId = null;
+        _ = CargarAsync();
+    }
+
+    private async Task AgregarAsync()
+    {
+        mensaje = null;
+        error = false;
+        var codigo = nuevoCodigo?.Trim();
+        if (string.IsNullOrWhiteSpace(codigo))
+        {
+            error = true;
+            mensaje = "Escribe el código de la posición.";
+            return;
+        }
+        if (nuevaCapacidad < 1)
+        {
+            error = true;
+            mensaje = "El cupo debe ser al menos 1.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            if (await db.Ubicaciones.AnyAsync(u => u.Codigo == codigo))
+            {
+                error = true;
+                mensaje = $"Ya existe una ubicación con el código '{codigo}'.";
+                return;
+            }
+            db.Ubicaciones.Add(new Ubicacion
+            {
+                Zona = string.IsNullOrWhiteSpace(nuevaZona) ? null : nuevaZona.Trim(),
+                Codigo = codigo,
+                Capacidad = nuevaCapacidad,
+                Notas = string.IsNullOrWhiteSpace(nuevasNotas) ? null : nuevasNotas.Trim(),
+                Activo = true
+            });
+            await db.SaveChangesAsync();
+            mensaje = $"Ubicación '{codigo}' agregada.";
+            nuevaZona = nuevoCodigo = nuevasNotas = null;
+            nuevaCapacidad = 1;
+            mostrarFormulario = false;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
+    }
+
+    private async Task GuardarFilaAsync(Ubicacion u)
+    {
+        mensaje = null;
+        error = false;
+        u.Codigo = u.Codigo?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(u.Codigo))
+        {
+            error = true;
+            mensaje = "La ubicación necesita un código.";
+            return;
+        }
+        if (u.Capacidad < 1)
+        {
+            error = true;
+            mensaje = "El cupo debe ser al menos 1.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            if (await db.Ubicaciones.AnyAsync(x => x.Codigo == u.Codigo && x.Id != u.Id))
+            {
+                error = true;
+                mensaje = $"Ya existe otra ubicación con el código '{u.Codigo}'.";
+                return;
+            }
+            u.Zona = string.IsNullOrWhiteSpace(u.Zona) ? null : u.Zona.Trim();
+            u.Notas = string.IsNullOrWhiteSpace(u.Notas) ? null : u.Notas.Trim();
+            db.Ubicaciones.Update(u);
+            await db.SaveChangesAsync();
+            mensaje = "Cambios guardados.";
+            editandoId = null;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
+    }
+
+    private async Task EliminarAsync(Ubicacion u)
+    {
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Ubicaciones.Remove(u);
+            await db.SaveChangesAsync();
+            mensaje = $"Ubicación '{u.Codigo}' eliminada.";
+            error = false;
+            editandoId = null;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
+    }
+}

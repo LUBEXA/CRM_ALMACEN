@@ -3,6 +3,7 @@ using System;
 using CRM_ALMACEN.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CRM_ALMACEN.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260628181539_UbicacionesAlmacen")]
+    partial class UbicacionesAlmacen
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -284,9 +287,6 @@ namespace CRM_ALMACEN.Data.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
 
-                    b.Property<int>("Posiciones")
-                        .HasColumnType("integer");
-
                     b.Property<int>("ProductoId")
                         .HasColumnType("integer");
 
@@ -298,14 +298,9 @@ namespace CRM_ALMACEN.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<int?>("UbicacionId")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ProductoId");
-
-                    b.HasIndex("UbicacionId");
 
                     b.ToTable("Entradas");
                 });
@@ -398,12 +393,17 @@ namespace CRM_ALMACEN.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int?>("UbicacionId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("UnidadMedida")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UbicacionId");
 
                     b.HasIndex("ClienteId", "Codigo")
                         .IsUnique();
@@ -749,14 +749,7 @@ namespace CRM_ALMACEN.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("CRM_ALMACEN.Models.Ubicacion", "Ubicacion")
-                        .WithMany("Entradas")
-                        .HasForeignKey("UbicacionId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Producto");
-
-                    b.Navigation("Ubicacion");
                 });
 
             modelBuilder.Entity("CRM_ALMACEN.Models.Pago", b =>
@@ -778,7 +771,14 @@ namespace CRM_ALMACEN.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CRM_ALMACEN.Models.Ubicacion", "UbicacionAsignada")
+                        .WithMany("Productos")
+                        .HasForeignKey("UbicacionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Cliente");
+
+                    b.Navigation("UbicacionAsignada");
                 });
 
             modelBuilder.Entity("CRM_ALMACEN.Models.Salida", b =>
@@ -875,7 +875,7 @@ namespace CRM_ALMACEN.Data.Migrations
 
             modelBuilder.Entity("CRM_ALMACEN.Models.Ubicacion", b =>
                 {
-                    b.Navigation("Entradas");
+                    b.Navigation("Productos");
                 });
 #pragma warning restore 612, 618
         }

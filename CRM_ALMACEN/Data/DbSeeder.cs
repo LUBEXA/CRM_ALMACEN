@@ -74,6 +74,11 @@ public static class DbSeeder
             await userManager.AddToRoleAsync(admin, RolAdmin);
         }
 
+        // Datos de ejemplo (cliente demo, pagos, pedido) DESACTIVADOS para operar
+        // con datos reales. Cambia a true si quieres volver a sembrar el demo.
+        var sembrarDatosDemo = false;
+        if (!sembrarDatosDemo) return;
+
         // 4. Cliente de ejemplo + su usuario + productos
         if (!await db.Clientes.AnyAsync())
         {

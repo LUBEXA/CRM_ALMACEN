@@ -61,7 +61,12 @@
       "PowerShell(\"abierto\")",
       "PowerShell($SC=\"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f851321b-ffe1-4cf1-9ff5-51362c26836d\\\\scratchpad\\\\pdftest\"; dotnet run --project \"$SC\\\\pdftest.csproj\" -- \"$SC\\\\orden-demo.pdf\" 2>&1 | Select-Object -Last 6; Start-Process \"$SC\\\\orden-demo.pdf\")",
       "Bash(python - C:/Users/memo_/AppData/Local/Temp/claude/C--Users-memo--source-repos-CRM-ALMACEN/f851321b-ffe1-4cf1-9ff5-51362c26836d/scratchpad/pdftest/Program.cs)",
-      "PowerShell($SC=\"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f851321b-ffe1-4cf1-9ff5-51362c26836d\\\\scratchpad\\\\pdftest\"; dotnet run --project \"$SC\\\\pdftest.csproj\" -- \"$SC\\\\orden-demo.pdf\" 2>&1 | Select-Object -Last 8; Start-Process \"$SC\\\\orden-demo.pdf\")"
+      "PowerShell($SC=\"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f851321b-ffe1-4cf1-9ff5-51362c26836d\\\\scratchpad\\\\pdftest\"; dotnet run --project \"$SC\\\\pdftest.csproj\" -- \"$SC\\\\orden-demo.pdf\" 2>&1 | Select-Object -Last 8; Start-Process \"$SC\\\\orden-demo.pdf\")",
+      "Bash(curl -s -o /dev/null http://localhost:5194/Account/Login)",
+      "Bash(psql --version)",
+      "Read(//c/Program Files/PostgreSQL/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "PowerShell(dotnet build \"C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN\\\\CRM_ALMACEN\\\\CRM_ALMACEN.csproj\" -nologo -v q 2>&1)"
     ]
   }
 }

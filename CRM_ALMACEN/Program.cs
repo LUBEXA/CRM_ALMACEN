@@ -73,6 +73,15 @@ builder.Services.AddAuthorizationCore(options =>
             .RequireAssertion(ctx => ctx.User.PuedeEditarModulo(m)));
     }
 
+    // Ocupación y Ubicaciones son herramientas internas del almacén: solo el personal,
+    // nunca el cliente, aunque el cliente pueda ver su inventario.
+    options.AddPolicy("Ver:OcupacionAlmacen", p => p.RequireAuthenticatedUser()
+        .RequireAssertion(ctx => ctx.User.EsPersonal() && ctx.User.PuedeVer(ModuloApp.Inventario)));
+
+    // Pantallas exclusivas del cliente (no del personal del almacén).
+    options.AddPolicy("EsCliente", p => p.RequireAuthenticatedUser()
+        .RequireAssertion(ctx => ctx.User.ClienteId() is not null));
+
     // El menú muestra la sección "Administración" si el usuario ve alguno de sus módulos.
     options.AddPolicy("VerAdministracion", p => p.RequireAuthenticatedUser()
         .RequireAssertion(ctx =>

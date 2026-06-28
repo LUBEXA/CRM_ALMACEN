@@ -13,6 +13,27 @@
         @if (auth.User.EsPersonal())
         {
             @* ----- PERSONAL DEL ALMACÉN: el Inicio es el tablero de pedidos ----- *@
+            @if (capacidadTotal > 0)
+            {
+                var pct = (double)ocupadoTotal / capacidadTotal * 100;
+                var color = pct >= 90 ? "bg-danger" : pct >= 70 ? "bg-warning" : "bg-success";
+                <a href="ocupacion" class="text-decoration-none">
+                    <div class="card mb-3">
+                        <div class="card-body py-2 d-flex align-items-center gap-3">
+                            <span class="bi bi-pie-chart-fill fs-4 text-secondary"></span>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-muted">Ocupación del almacén</span>
+                                    <span class="fw-bold">@pct.ToString("0")% · @(capacidadTotal - ocupadoTotal) espacios libres</span>
+                                </div>
+                                <div class="progress mt-1" style="height:10px">
+                                    <div class="progress-bar @color" style="width:@pct.ToString("0", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            }
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <p class="text-muted mb-0">Gestiona los pedidos de tus clientes.</p>
                 <span class="text-muted small">Arrastra las tarjetas entre columnas o haz clic para ver el detalle</span>
@@ -61,14 +82,26 @@
 
     private bool cargando = true;
     private int totalProductos, totalExistencias, solicitudesPendientes;
+    private int capacidadTotal, ocupadoTotal;
 
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthStateTask).User;
 
-        // El resumen solo aplica al cliente; el personal del almacén ve el tablero.
+        // El resumen solo aplica al cliente; el personal del almacén ve el tablero
+        // (con una franja de ocupación del almacén arriba).
         if (user.EsPersonal())
         {
+            await using var dbp = await DbFactory.CreateDbContextAsync();
+            var ubics = await dbp.Ubicaciones.Where(u => u.Activo)
+                .Select(u => new { u.Id, u.Capacidad }).ToListAsync();
+            var ocupPorUbic = await dbp.Entradas
+                .Where(e => e.UbicacionId != null && e.Producto!.Activo && e.Producto.CantidadDisponible > 0)
+                .GroupBy(e => e.UbicacionId!.Value)
+                .Select(g => new { g.Key, Total = g.Sum(e => e.Posiciones) })
+                .ToDictionaryAsync(x => x.Key, x => x.Total);
+            capacidadTotal = ubics.Sum(u => u.Capacidad);
+            ocupadoTotal = ubics.Sum(u => Math.Min(u.Capacidad, ocupPorUbic.GetValueOrDefault(u.Id, 0)));
             cargando = false;
             return;
         }

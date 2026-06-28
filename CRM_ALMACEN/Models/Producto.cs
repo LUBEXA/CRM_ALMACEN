@@ -28,7 +28,8 @@ public class Producto
     [MaxLength(20)]
     public string UnidadMedida { get; set; } = "PZA";    // PZA, CAJA, KG, etc.
 
-    /// <summary>Ubicación física dentro del almacén (pasillo, rack, nivel, etc.).</summary>
+    /// <summary>Ubicación física dentro del almacén (pasillo, rack, nivel, etc.).
+    /// Texto libre informativo; la ubicación real para ocupación se registra en cada Entrada.</summary>
     [MaxLength(50)]
     public string? Ubicacion { get; set; }
 

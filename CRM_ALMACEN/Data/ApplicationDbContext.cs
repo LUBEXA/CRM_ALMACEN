@@ -21,6 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Pago> Pagos => Set<Pago>();
     public DbSet<CostoServicio> CostosServicio => Set<CostoServicio>();
     public DbSet<Servicio> Servicios => Set<Servicio>();
+    public DbSet<Ubicacion> Ubicaciones => Set<Ubicacion>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -30,6 +31,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<Producto>()
             .HasIndex(p => new { p.ClienteId, p.Codigo })
             .IsUnique();
+
+        // Código de ubicación único
+        builder.Entity<Ubicacion>()
+            .HasIndex(u => u.Codigo)
+            .IsUnique();
+
+        // Entrada -> Ubicación: al borrar la ubicación, la entrada queda sin rack asignado
+        builder.Entity<Entrada>()
+            .HasOne(e => e.Ubicacion)
+            .WithMany(u => u.Entradas)
+            .HasForeignKey(e => e.UbicacionId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Evitar borrados en cascada que disparen ciclos en SQL Server
         builder.Entity<Entrada>()
