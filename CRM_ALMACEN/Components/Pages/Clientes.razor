@@ -1,5 +1,5 @@
 @page "/clientes"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Policy = "Ver:Clientes")]
 @rendermode InteractiveServer
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
@@ -10,6 +10,8 @@
 <h1>👥 Clientes</h1>
 <p class="text-muted">Empresas que almacenan mercancía.</p>
 
+@if (puedeEditar)
+{
 <div class="card mb-4">
     <div class="card-header">Registrar nuevo cliente</div>
     <div class="card-body">
@@ -139,6 +141,7 @@
         }
     </div>
 </div>
+}
 
 @if (clientes is null)
 {
@@ -158,12 +161,15 @@ else
                     <td>@c.Telefono</td>
                     <td>@c.Productos.Count</td>
                     <td class="text-end">
-                        <a href="clientes/editar/@c.Id" class="btn btn-sm btn-outline-primary">
-                            <span class="bi bi-pencil"></span> Editar
-                        </a>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => PedirEliminar(c)">
-                            <span class="bi bi-trash"></span> Eliminar
-                        </button>
+                        @if (puedeEditar)
+                        {
+                            <a href="clientes/editar/@c.Id" class="btn btn-sm btn-outline-primary">
+                                <span class="bi bi-pencil"></span> Editar
+                            </a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => PedirEliminar(c)">
+                                <span class="bi bi-trash"></span> Eliminar
+                            </button>
+                        }
                     </td>
                 </tr>
             }
@@ -202,6 +208,10 @@ else
 }
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private bool puedeEditar;
     private List<Cliente>? clientes;
     private Cliente nuevo = new();
     private string? mensaje;
@@ -224,7 +234,12 @@ else
     private Cliente? clienteAEliminar;
     private bool eliminando;
 
-    protected override async Task OnInitializedAsync() => await CargarAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        puedeEditar = user.PuedeEditarModulo(ModuloApp.Clientes);
+        await CargarAsync();
+    }
 
     private async Task CargarAsync()
     {

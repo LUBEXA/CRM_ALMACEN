@@ -13,6 +13,33 @@ public static class DbSeeder
     public const string RolAdmin = "Admin";
     public const string RolCliente = "Cliente";
 
+    // Roles del personal del almacén (colaboradores internos, no clientes).
+    public const string RolAlmacenista = "Almacenista";
+    public const string RolCobranza = "Cobranza";
+    public const string RolAtencion = "AtencionClientes";
+    public const string RolSupervisor = "Supervisor";
+
+    /// <summary>Todos los roles que existen en el sistema.</summary>
+    public static readonly string[] TodosLosRoles =
+        [RolAdmin, RolCliente, RolAlmacenista, RolCobranza, RolAtencion, RolSupervisor];
+
+    /// <summary>
+    /// Roles internos que el administrador puede asignar al personal, con su
+    /// nombre legible para mostrar en pantalla.
+    /// </summary>
+    public static readonly IReadOnlyList<(string Rol, string Nombre)> RolesInternos =
+    [
+        (RolAdmin, "Administrador (acceso total)"),
+        (RolAlmacenista, "Almacenista / Operador"),
+        (RolCobranza, "Cobranza / Facturación"),
+        (RolAtencion, "Atención a clientes"),
+        (RolSupervisor, "Supervisor (solo lectura)")
+    ];
+
+    /// <summary>Nombre legible de un rol; si no se conoce, devuelve el mismo código.</summary>
+    public static string NombreRol(string rol) =>
+        RolesInternos.FirstOrDefault(r => r.Rol == rol).Nombre ?? rol;
+
     public static async Task SeedAsync(IServiceProvider services)
     {
         using var scope = services.CreateScope();
@@ -26,7 +53,7 @@ public static class DbSeeder
         await db.Database.MigrateAsync();
 
         // 2. Roles
-        foreach (var rol in new[] { RolAdmin, RolCliente })
+        foreach (var rol in TodosLosRoles)
         {
             if (!await roleManager.RoleExistsAsync(rol))
                 await roleManager.CreateAsync(new IdentityRole(rol));

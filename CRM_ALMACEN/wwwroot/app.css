@@ -673,16 +673,37 @@ main {
 .kanban-detalle {
     background: var(--surface);
     border-radius: var(--r-lg);
-    padding: 1.75rem;
+    padding: 2rem 2.25rem;
     width: 100%;
-    max-width: 560px;
+    max-width: 720px;
     box-shadow: var(--shadow-lg);
-    max-height: 90vh;
+    max-height: 92vh;
     overflow-y: auto;
+}
+
+/* Bloque de cobros resaltado dentro del modal */
+.kanban-cobros {
+    background: #f8fafc;
+    border: 1px solid #e6eaf2;
+    border-radius: var(--r-md);
+    padding: 1.25rem 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.kanban-cobros h6 { color: #334155; }
+
+/* Caja para agregar un cobro nuevo */
+.kanban-cobros-add {
+    background: var(--surface);
+    border: 1px dashed #cdd4e0;
+    border-radius: var(--r-md);
+    padding: 1rem 1.25rem;
+    margin-top: .75rem;
 }
 
 @media (max-width: 768px) {
     .kanban { grid-template-columns: 1fr; }
+    .kanban-detalle { padding: 1.5rem 1.25rem; }
 }
 
 /* ---------- Total del periodo (Pagos) ---------- */

@@ -1,5 +1,5 @@
 @page "/solicitudes"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "Ver:Solicitudes")]
 @rendermode InteractiveServer
 
 @using Microsoft.JSInterop
@@ -280,7 +280,7 @@ else
                     <p class="text-muted small mb-2">Notas: @s.Notas</p>
                 }
 
-                @if (esAdmin && s.Estado == EstadoSolicitud.Pendiente)
+                @if (puedeEditar && s.Estado == EstadoSolicitud.Pendiente)
                 {
                     var sinCobros = CobrosDe(s.Id).Count == 0;
                     <button class="btn btn-sm btn-success me-2" @onclick="() => SurtirAsync(s.Id)" disabled="@sinCobros">Aprobar y surtir</button>
@@ -294,8 +294,8 @@ else
                     }
                 }
 
-                @* ---- Cobros del pedido (solo administrador) ---- *@
-                @if (esAdmin)
+                @* ---- Cobros del pedido (solo quien puede editar) ---- *@
+                @if (puedeEditar)
                 {
                     var cobros = CobrosDe(s.Id);
                     var tarifario = TarifarioDe(s.ClienteId);
@@ -428,6 +428,7 @@ else
     private List<Producto> misProductos = [];
     private List<Cliente> clientes = [];
     private bool esAdmin;
+    private bool puedeEditar;
     private int? clienteId;
     private string? usuario;
 
@@ -503,7 +504,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthStateTask).User;
-        esAdmin = user.EsAdmin();
+        esAdmin = user.EsPersonal();
+        puedeEditar = user.PuedeEditarModulo(ModuloApp.Solicitudes);
         clienteId = user.ClienteId();
         usuario = user.Identity?.Name;
 
@@ -599,7 +601,7 @@ else
             misProductos = await db.Productos.Where(p => p.Activo && p.ClienteId == cid)
                 .OrderBy(p => p.Nombre).ToListAsync();
 
-        if (esAdmin)
+        if (puedeEditar)
         {
             var ids = solicitudes.Select(s => s.Id).ToList();
             cobrosPorSolicitud = (await db.Cargos

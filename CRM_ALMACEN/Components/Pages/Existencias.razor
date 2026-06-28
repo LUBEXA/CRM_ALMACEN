@@ -1,5 +1,5 @@
 @page "/existencias"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "Ver:Inventario")]
 @rendermode InteractiveServer
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
@@ -43,7 +43,7 @@ else
                     <th>Unidad</th>
                     <th class="text-end">Disponible</th>
                     <th>Estado</th>
-                    @if (esAdmin)
+                    @if (puedeEditar)
                     {
                         <th class="text-end" style="width:200px">Acciones</th>
                     }
@@ -53,7 +53,7 @@ else
                 @foreach (var p in lista)
                 {
                     var item = p;
-                    @if (esAdmin && editandoId == item.Id)
+                    @if (puedeEditar && editandoId == item.Id)
                     {
                         <tr>
                             <td><code>@item.Codigo</code></td>
@@ -99,7 +99,7 @@ else
                                     <span class="badge text-bg-success">OK</span>
                                 }
                             </td>
-                            @if (esAdmin)
+                            @if (puedeEditar)
                             {
                                 <td class="text-end">
                                     <div class="d-flex gap-2 justify-content-end">
@@ -117,7 +117,7 @@ else
                 }
                 @if (lista.Count == 0)
                 {
-                    <tr><td colspan="@(esAdmin ? 8 : 6)" class="text-center text-muted py-4">Sin productos.</td></tr>
+                    <tr><td colspan="@(6 + (esAdmin ? 1 : 0) + (puedeEditar ? 1 : 0))" class="text-center text-muted py-4">Sin productos.</td></tr>
                 }
             </tbody>
         </table>
@@ -130,6 +130,7 @@ else
 
     private List<Producto>? productos;
     private bool esAdmin;
+    private bool puedeEditar;
     private int? clienteId;
     private string filtro = "";
     private int? editandoId;
@@ -140,7 +141,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthStateTask).User;
-        esAdmin = user.EsAdmin();
+        esAdmin = user.EsPersonal();
+        puedeEditar = user.PuedeEditarModulo(ModuloApp.Inventario);
         clienteId = user.ClienteId();
         await CargarAsync();
     }

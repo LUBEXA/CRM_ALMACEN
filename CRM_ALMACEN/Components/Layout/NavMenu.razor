@@ -34,47 +34,70 @@
                 <span class="bi bi-person-badge" aria-hidden="true"></span> <span class="link-text">Perfil</span>
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="pagos" title="Pagos y Facturación">
-                <span class="bi bi-credit-card-2-front" aria-hidden="true"></span> <span class="link-text">Pagos y Facturación</span>
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="existencias" title="Inventario">
-                <span class="bi bi-box-seam" aria-hidden="true"></span> <span class="link-text">Inventario</span>
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="entradas" title="Entradas">
-                <span class="bi bi-arrow-down-circle" aria-hidden="true"></span> <span class="link-text">Entradas</span>
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="salidas" title="Salidas">
-                <span class="bi bi-arrow-up-circle" aria-hidden="true"></span> <span class="link-text">Salidas</span>
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="solicitudes" title="Solicitudes de pedido">
-                <span class="bi bi-card-checklist" aria-hidden="true"></span> <span class="link-text">Solicitudes de pedido</span>
-            </NavLink>
-        </div>
+        <AuthorizeView Policy="Ver:Pagos">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="pagos" title="Pagos y Facturación">
+                    <span class="bi bi-credit-card-2-front" aria-hidden="true"></span> <span class="link-text">Pagos y Facturación</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:Inventario">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="existencias" title="Inventario">
+                    <span class="bi bi-box-seam" aria-hidden="true"></span> <span class="link-text">Inventario</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:Entradas">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="entradas" title="Entradas">
+                    <span class="bi bi-arrow-down-circle" aria-hidden="true"></span> <span class="link-text">Entradas</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:Salidas">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="salidas" title="Salidas">
+                    <span class="bi bi-arrow-up-circle" aria-hidden="true"></span> <span class="link-text">Salidas</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:Solicitudes">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="solicitudes" title="Solicitudes de pedido">
+                    <span class="bi bi-card-checklist" aria-hidden="true"></span> <span class="link-text">Solicitudes de pedido</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
 
-        <AuthorizeView Roles="Admin">
+        <AuthorizeView Policy="VerAdministracion">
             <div class="nav-section"><span class="link-text">Administración</span></div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:Clientes">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="clientes" title="Clientes">
                     <span class="bi bi-people-fill" aria-hidden="true"></span> <span class="link-text">Clientes</span>
                 </NavLink>
             </div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:Productos">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="productos" title="Productos">
                     <span class="bi bi-tags-fill" aria-hidden="true"></span> <span class="link-text">Productos</span>
                 </NavLink>
             </div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:ListaPrecios">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="lista-precios" title="Lista de precios">
                     <span class="bi bi-cash-stack" aria-hidden="true"></span> <span class="link-text">Lista de precios</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
+        <AuthorizeView Roles="Admin">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="personal" title="Personal y accesos">
+                    <span class="bi bi-person-badge-fill" aria-hidden="true"></span> <span class="link-text">Personal y accesos</span>
                 </NavLink>
             </div>
         </AuthorizeView>

@@ -1,5 +1,5 @@
 @page "/salidas"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "Ver:Salidas")]
 @rendermode InteractiveServer
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
@@ -25,12 +25,13 @@ else
             <thead>
                 <tr>
                     <th>Fecha</th>
+                    <th>Código</th>
                     <th>Producto</th>
                     <th>Ubicación</th>
                     <th class="text-end">Cantidad</th>
                     <th>Referencia</th>
                     <th>Registró</th>
-                    @if (esAdmin)
+                    @if (puedeEditar)
                     {
                         <th class="text-end" style="width:200px">Acciones</th>
                     }
@@ -40,11 +41,12 @@ else
                 @foreach (var s in salidas)
                 {
                     var item = s;
-                    @if (esAdmin && editandoId == item.Id)
+                    @if (puedeEditar && editandoId == item.Id)
                     {
                         <tr>
                             <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
-                            <td>@item.Producto?.Codigo — @item.Producto?.Nombre</td>
+                            <td><code>@item.Producto?.Codigo</code></td>
+                            <td>@item.Producto?.Nombre</td>
                             <td>@(string.IsNullOrWhiteSpace(item.Producto?.Ubicacion) ? "—" : item.Producto!.Ubicacion)</td>
                             <td class="text-end">
                                 <input type="number" min="1" class="form-control form-control-sm text-end" @bind="editCantidad" style="max-width:90px;display:inline-block" />
@@ -67,12 +69,13 @@ else
                     {
                         <tr>
                             <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
-                            <td>@item.Producto?.Codigo — @item.Producto?.Nombre</td>
+                            <td><code>@item.Producto?.Codigo</code></td>
+                            <td>@item.Producto?.Nombre</td>
                             <td>@(string.IsNullOrWhiteSpace(item.Producto?.Ubicacion) ? "—" : item.Producto!.Ubicacion)</td>
                             <td class="text-end fw-bold text-danger">-@item.Cantidad</td>
                             <td>@item.Referencia</td>
                             <td class="small text-muted">@item.RegistradoPor</td>
-                            @if (esAdmin)
+                            @if (puedeEditar)
                             {
                                 <td class="text-end">
                                     <div class="d-flex gap-2 justify-content-end">
@@ -90,7 +93,7 @@ else
                 }
                 @if (salidas.Count == 0)
                 {
-                    <tr><td colspan="@(esAdmin ? 7 : 6)" class="text-center text-muted py-4">Sin salidas registradas.</td></tr>
+                    <tr><td colspan="@(puedeEditar ? 8 : 7)" class="text-center text-muted py-4">Sin salidas registradas.</td></tr>
                 }
             </tbody>
         </table>
@@ -102,7 +105,7 @@ else
     private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
 
     private List<Salida>? salidas;
-    private bool esAdmin;
+    private bool puedeEditar;
     private int? clienteId;
     private string? mensaje;
     private bool error;
@@ -115,7 +118,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthStateTask).User;
-        esAdmin = user.EsAdmin();
+        puedeEditar = user.PuedeEditarModulo(ModuloApp.Salidas);
         clienteId = user.ClienteId();
         await CargarAsync();
     }

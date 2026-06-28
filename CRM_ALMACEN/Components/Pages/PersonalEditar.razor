@@ -1,0 +1,155 @@
+@page "/personal/editar/{Id}"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using System.Security.Claims
+
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Navigation
+
+<PageTitle>Accesos del colaborador - CRM Almacén</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <a href="personal" class="btn btn-sm btn-outline-secondary"><span class="bi bi-arrow-left"></span> Volver</a>
+    <h1 class="mb-0">Accesos del colaborador</h1>
+</div>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (usuario is null)
+{
+    <div class="alert alert-danger">Colaborador no encontrado.</div>
+}
+else if (esAdmin)
+{
+    <div class="alert alert-info">
+        <strong>@usuario.NombreCompleto</strong> es <strong>Administrador</strong> y tiene acceso total
+        a todas las pantallas. Este acceso no se puede limitar.
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <h5 class="mb-0">@usuario.NombreCompleto</h5>
+                    <span class="text-muted small">@usuario.Email</span>
+                </div>
+                <div class="text-end">
+                    <label class="form-label small mb-1 d-block">Aplicar una plantilla de rol</label>
+                    <div class="btn-group btn-group-sm flex-wrap" role="group">
+                        @foreach (var r in DbSeeder.RolesInternos.Where(r => r.Rol != DbSeeder.RolAdmin))
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="() => AplicarPlantilla(r.Rol)">@r.Nombre</button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-muted small">
+                Marca, pantalla por pantalla, qué puede hacer esta persona. «Solo ver» le deja
+                consultar sin modificar; «Editar» le permite crear, cambiar y eliminar.
+            </p>
+
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:55%">Pantalla</th>
+                            <th style="width:45%">Acceso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Permisos.Modulos)
+                        {
+                            var modulo = item.Modulo;
+                            <tr>
+                                <td>@item.Nombre</td>
+                                <td>
+                                    <select class="form-select form-select-sm" style="max-width:220px" @bind="seleccion[modulo]">
+                                        <option value="@NivelAcceso.SinAcceso">🚫 Sin acceso</option>
+                                        <option value="@NivelAcceso.SoloVer">👁️ Solo ver</option>
+                                        <option value="@NivelAcceso.Editar">✏️ Editar</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-3 align-items-center">
+                @if (mensaje is not null)
+                {
+                    <span class="text-success small me-auto"><span class="bi bi-check-circle"></span> @mensaje</span>
+                }
+                <a href="personal" class="btn btn-outline-secondary">Cancelar</a>
+                <button class="btn btn-primary px-4" @onclick="GuardarAsync" disabled="@guardando">
+                    @(guardando ? "Guardando..." : "Guardar accesos")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private ApplicationUser? usuario;
+    private bool esAdmin;
+    private bool cargando = true;
+    private bool guardando;
+    private string? mensaje;
+
+    private readonly Dictionary<ModuloApp, NivelAcceso> seleccion = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        usuario = await UserManager.FindByIdAsync(Id);
+        if (usuario is not null)
+        {
+            var roles = await UserManager.GetRolesAsync(usuario);
+            esAdmin = roles.Contains(DbSeeder.RolAdmin);
+
+            var claims = await UserManager.GetClaimsAsync(usuario);
+            foreach (var (modulo, _) in Permisos.Modulos)
+                seleccion[modulo] = Permisos.NivelEfectivo(modulo, claims, roles);
+        }
+        cargando = false;
+    }
+
+    private void AplicarPlantilla(string rol)
+    {
+        mensaje = null;
+        var plantilla = Permisos.Plantilla(rol);
+        foreach (var (modulo, _) in Permisos.Modulos)
+            seleccion[modulo] = plantilla.GetValueOrDefault(modulo, NivelAcceso.SinAcceso);
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (usuario is null) return;
+        guardando = true;
+        mensaje = null;
+        try
+        {
+            // Reemplaza los permisos guardados por los de la tabla.
+            var existentes = (await UserManager.GetClaimsAsync(usuario))
+                .Where(c => c.Type.StartsWith(Permisos.PrefijoClaim)).ToList();
+            if (existentes.Count > 0)
+                await UserManager.RemoveClaimsAsync(usuario, existentes);
+
+            foreach (var (modulo, nivel) in seleccion)
+                await UserManager.AddClaimAsync(usuario,
+                    new Claim(Permisos.ClaimType(modulo), ((int)nivel).ToString()));
+
+            // Fuerza que la sesión del colaborador se revalide con los nuevos permisos.
+            await UserManager.UpdateSecurityStampAsync(usuario);
+
+            mensaje = "Accesos guardados. Tendrán efecto la próxima vez que la persona inicie sesión.";
+        }
+        finally { guardando = false; }
+    }
+}

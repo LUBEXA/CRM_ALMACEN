@@ -1,5 +1,5 @@
 @page "/pagos"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "Ver:Pagos")]
 @rendermode InteractiveServer
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
@@ -61,18 +61,18 @@ else
                     <thead>
                         <tr>
                             <th>Concepto</th>
-                            @if (esAdmin) { <th style="min-width:140px">Tipo</th> }
+                            @if (puedeEditar) { <th style="min-width:140px">Tipo</th> }
                             <th class="text-center">Cantidad</th>
-                            @if (esAdmin) { <th class="text-end" style="min-width:140px">Precio unitario</th> }
+                            @if (puedeEditar) { <th class="text-end" style="min-width:140px">Precio unitario</th> }
                             <th class="text-end">Importe</th>
-                            @if (esAdmin) { <th></th> }
+                            @if (puedeEditar) { <th></th> }
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var c in cargosPeriodo)
                         {
                             <tr>
-                                @if (esAdmin)
+                                @if (puedeEditar)
                                 {
                                     <td><input class="form-control form-control-sm" @bind="c.Concepto" /></td>
                                     <td>
@@ -113,33 +113,33 @@ else
                         }
                         @if (cargosPeriodo.Count == 0)
                         {
-                            <tr><td colspan="@(esAdmin ? 6 : 3)" class="text-center text-muted py-3">Sin cargos en este periodo.</td></tr>
+                            <tr><td colspan="@(puedeEditar ? 6 : 3)" class="text-center text-muted py-3">Sin cargos en este periodo.</td></tr>
                         }
                     </tbody>
                     @if (cargosPeriodo.Count > 0)
                     {
                         <tfoot>
                             <tr class="periodo-total">
-                                <td class="fw-bold" colspan="@(esAdmin ? 4 : 2)">Total del periodo</td>
+                                <td class="fw-bold" colspan="@(puedeEditar ? 4 : 2)">Total del periodo</td>
                                 <td class="text-end fw-bold">@Money(TotalCargos)</td>
-                                @if (esAdmin) { <td></td> }
+                                @if (puedeEditar) { <td></td> }
                             </tr>
                             <tr>
-                                <td class="text-muted" colspan="@(esAdmin ? 4 : 2)">Pagado</td>
+                                <td class="text-muted" colspan="@(puedeEditar ? 4 : 2)">Pagado</td>
                                 <td class="text-end text-success">@Money(TotalPagado)</td>
-                                @if (esAdmin) { <td></td> }
+                                @if (puedeEditar) { <td></td> }
                             </tr>
                             <tr>
-                                <td class="fw-semibold" colspan="@(esAdmin ? 4 : 2)">Saldo pendiente</td>
+                                <td class="fw-semibold" colspan="@(puedeEditar ? 4 : 2)">Saldo pendiente</td>
                                 <td class="text-end fw-semibold @(Saldo > 0 ? "text-danger" : "text-success")">@Money(Saldo)</td>
-                                @if (esAdmin) { <td></td> }
+                                @if (puedeEditar) { <td></td> }
                             </tr>
                         </tfoot>
                     }
                 </table>
             </div>
 
-            @if (esAdmin)
+            @if (puedeEditar)
             {
                 <hr />
                 <div class="d-flex flex-wrap gap-2 mb-3">
@@ -193,7 +193,7 @@ else
         <div class="card-body p-4">
             <h5 class="text-primary mb-3">Pagos y facturas de @NombresMes.Get(PeriodoMes) @PeriodoAnio</h5>
 
-            @if (esAdmin)
+            @if (puedeEditar)
             {
                 @* Vista de administrador: una tarjeta editable por pago (los campos se acomodan solos). *@
                 @if (pagosPeriodo.Count == 0)
@@ -316,7 +316,7 @@ else
                 </div>
             }
 
-            @if (esAdmin)
+            @if (puedeEditar)
             {
                 <hr />
                 <h6 class="mb-3">Registrar pago de este periodo</h6>
@@ -374,7 +374,7 @@ else
                             <th>Método de pago</th>
                             <th class="text-center">XML</th>
                             <th class="text-center">PDF</th>
-                            @if (esAdmin) { <th></th> }
+                            @if (puedeEditar) { <th></th> }
                         </tr>
                     </thead>
                     <tbody>
@@ -399,7 +399,7 @@ else
                                     }
                                     else { <span class="text-muted">—</span> }
                                 </td>
-                                @if (esAdmin)
+                                @if (puedeEditar)
                                 {
                                     <td class="text-end">
                                         <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarPagoAsync(p.Id)" title="Eliminar pago"><span class="bi bi-trash"></span></button>
@@ -409,7 +409,7 @@ else
                         }
                         @if (pagosTodos.Count == 0)
                         {
-                            <tr><td colspan="@(esAdmin ? 7 : 6)" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>
+                            <tr><td colspan="@(puedeEditar ? 7 : 6)" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>
                         }
                     </tbody>
                 </table>
@@ -422,7 +422,8 @@ else
     [CascadingParameter]
     private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
 
-    private bool esAdmin;
+    private bool esAdmin;        // personal del almacén (ve todos los clientes con el selector)
+    private bool puedeEditar;    // puede modificar (Admin/Cobranza); el Supervisor solo mira
     private bool cargando = true;
     private bool procesando;
     private int? clienteId;
@@ -464,7 +465,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthStateTask).User;
-        esAdmin = user.EsAdmin();
+        esAdmin = user.EsPersonal();
+        puedeEditar = user.PuedeEditarModulo(ModuloApp.Pagos);
         usuario = user.Identity?.Name;
 
         if (esAdmin)

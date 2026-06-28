@@ -10,14 +10,14 @@
     <Authorized Context="auth">
         <h1>Bienvenido, @auth.User.NombreParaMostrar()</h1>
 
-        @if (auth.User.EsAdmin())
+        @if (auth.User.EsPersonal())
         {
-            @* ----- ADMIN: el Inicio es el tablero de pedidos ----- *@
+            @* ----- PERSONAL DEL ALMACÉN: el Inicio es el tablero de pedidos ----- *@
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <p class="text-muted mb-0">Gestiona los pedidos de tus clientes.</p>
                 <span class="text-muted small">Arrastra las tarjetas entre columnas o haz clic para ver el detalle</span>
             </div>
-            <KanbanPedidos />
+            <KanbanPedidos SoloLectura="@(!auth.User.PuedeGestionarPedidos())" />
         }
         else
         {
@@ -66,8 +66,8 @@
     {
         var user = (await AuthStateTask).User;
 
-        // El resumen solo aplica al cliente; el admin ve el tablero.
-        if (user.EsAdmin())
+        // El resumen solo aplica al cliente; el personal del almacén ve el tablero.
+        if (user.EsPersonal())
         {
             cargando = false;
             return;

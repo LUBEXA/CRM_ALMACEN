@@ -40,7 +40,28 @@
       "PowerShell(git -C C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN add CRM_ALMACEN/Components/Pages/Entradas.razor CRM_ALMACEN/Components/Pages/Productos.razor CRM_ALMACEN/Components/Pages/Solicitudes.razor)",
       "PowerShell(git -C C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN push origin main)",
       "PowerShell($c = Get-NetTCPConnection -LocalPort 5194 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | Select-Object LocalPort, OwningProcess; Get-Process -Id $c.OwningProcess | Select-Object Id, ProcessName } else { \"Puerto 5194 libre\" })",
-      "PowerShell(git add -A)"
+      "PowerShell(git add -A)",
+      "PowerShell(git push origin main)",
+      "PowerShell($env:PGPASSWORD=\"postgres\"; $dump=\"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\pg_dump.exe\"; $out=\"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f4f35346-11e3-4d3f-818e-4721e56dad5c\\\\scratchpad\\\\CRM_ALMACEN_backup_$\\(Get-Date -Format yyyyMMdd_HHmmss\\).sql\"; & $dump -h localhost -U postgres -d CRM_ALMACEN -f $out; if \\($?\\) { Write-Output \"Respaldo creado:\"; \\(Get-Item $out\\).FullName; \"{0:N0} KB\" -f \\(\\(Get-Item $out\\).Length/1KB\\) })",
+      "PowerShell(dotnet ef migrations add ProductoUbicacion --project CRM_ALMACEN/CRM_ALMACEN.csproj)",
+      "Bash(git commit -m '@ *)",
+      "Bash(git commit --amend -m 'Ubicacion en productos, reserva de stock al solicitar y edicion de movimientos' -m '- Producto: nuevo campo Ubicacion \\(migracion ProductoUbicacion\\); se captura, lista, edita y muestra en Entradas/Salidas/Existencias *)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "PowerShell(dotnet build \"C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN\\\\CRM_ALMACEN\\\\CRM_ALMACEN.csproj\" -nologo -clp:ErrorsOnly 2>&1)",
+      "Bash(ls wwwroot/*.js)",
+      "Bash(grep -rin \"script\" Components/App.razor)",
+      "PowerShell(Get-Process -Name CRM_ALMACEN -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell(\"stopped\")",
+      "PowerShell(dotnet add \"C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN\\\\CRM_ALMACEN\\\\CRM_ALMACEN.csproj\" package QuestPDF 2>&1)",
+      "PowerShell($SC=\"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f851321b-ffe1-4cf1-9ff5-51362c26836d\\\\scratchpad\\\\pdftest\"; dotnet run --project \"$SC\\\\pdftest.csproj\" -- \"$SC\\\\orden-demo.pdf\" 2>&1 | Select-Object -Last 15)",
+      "PowerShell($SC=\"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f851321b-ffe1-4cf1-9ff5-51362c26836d\\\\scratchpad\\\\pdftest\"; $pdftoppm = \\(Get-Command pdftoppm -ErrorAction SilentlyContinue\\); if \\($pdftoppm\\) { & pdftoppm -png -r 110 \"$SC\\\\orden-demo.pdf\" \"$SC\\\\preview\"; \"pdftoppm ok\" } else { \"no-pdftoppm\" }; if \\(Get-Command magick -ErrorAction SilentlyContinue\\) { \"magick-ok\" } else { \"no-magick\" })",
+      "PowerShell(Start-Process \"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f851321b-ffe1-4cf1-9ff5-51362c26836d\\\\scratchpad\\\\pdftest\\\\orden-demo.pdf\")",
+      "PowerShell(\"abierto\")",
+      "PowerShell($SC=\"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f851321b-ffe1-4cf1-9ff5-51362c26836d\\\\scratchpad\\\\pdftest\"; dotnet run --project \"$SC\\\\pdftest.csproj\" -- \"$SC\\\\orden-demo.pdf\" 2>&1 | Select-Object -Last 6; Start-Process \"$SC\\\\orden-demo.pdf\")",
+      "Bash(python - C:/Users/memo_/AppData/Local/Temp/claude/C--Users-memo--source-repos-CRM-ALMACEN/f851321b-ffe1-4cf1-9ff5-51362c26836d/scratchpad/pdftest/Program.cs)",
+      "PowerShell($SC=\"C:\\\\Users\\\\memo_\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-memo--source-repos-CRM-ALMACEN\\\\f851321b-ffe1-4cf1-9ff5-51362c26836d\\\\scratchpad\\\\pdftest\"; dotnet run --project \"$SC\\\\pdftest.csproj\" -- \"$SC\\\\orden-demo.pdf\" 2>&1 | Select-Object -Last 8; Start-Process \"$SC\\\\orden-demo.pdf\")"
     ]
   }
 }

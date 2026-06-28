@@ -9,6 +9,9 @@ using Microsoft.EntityFrameworkCore;
 // las maneja. Evita el requisito de UTC de Npgsql para un negocio de una sola zona.
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
+// QuestPDF: licencia gratuita Community.
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Blazor (componentes interactivos del lado servidor) ---
@@ -57,6 +60,26 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     .AddSignInManager()
     .AddClaimsPrincipalFactory<AdditionalUserClaimsPrincipalFactory>()
     .AddDefaultTokenProviders();
+
+// --- Permisos por módulo (políticas que leen los permisos guardados del usuario) ---
+builder.Services.AddAuthorizationCore(options =>
+{
+    foreach (var (modulo, _) in Permisos.Modulos)
+    {
+        var m = modulo;
+        options.AddPolicy($"Ver:{m}", p => p.RequireAuthenticatedUser()
+            .RequireAssertion(ctx => ctx.User.PuedeVer(m)));
+        options.AddPolicy($"Editar:{m}", p => p.RequireAuthenticatedUser()
+            .RequireAssertion(ctx => ctx.User.PuedeEditarModulo(m)));
+    }
+
+    // El menú muestra la sección "Administración" si el usuario ve alguno de sus módulos.
+    options.AddPolicy("VerAdministracion", p => p.RequireAuthenticatedUser()
+        .RequireAssertion(ctx =>
+            ctx.User.PuedeVer(ModuloApp.Clientes) ||
+            ctx.User.PuedeVer(ModuloApp.Productos) ||
+            ctx.User.PuedeVer(ModuloApp.ListaPrecios)));
+});
 
 var app = builder.Build();
 
