@@ -1,0 +1,125 @@
+@page "/movimientos"
+@attribute [Authorize(Policy = "Ver:Movimientos")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Movimientos - CRM Almacén</PageTitle>
+
+<h1>🔄 Movimientos</h1>
+<p class="text-muted">Historial combinado de entradas (mercancía que llegó al almacén) y salidas (mercancía entregada) de todos los clientes.</p>
+
+@if (movimientos is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <select class="form-select form-select-sm" style="max-width:200px" @bind="filtroTipo">
+            <option value="">Todos los movimientos</option>
+            <option value="entrada">Solo entradas</option>
+            <option value="salida">Solo salidas</option>
+        </select>
+        <select class="form-select form-select-sm" style="max-width:240px" @bind="filtroCliente">
+            <option value="0">Todos los clientes</option>
+            @foreach (var c in clientes)
+            {
+                <option value="@c.Key">@c.Value</option>
+            }
+        </select>
+        <input class="form-control form-control-sm" style="max-width:280px" placeholder="Buscar por código, producto o referencia" @bind="busqueda" />
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Cliente</th>
+                    <th>Código</th>
+                    <th>Producto</th>
+                    <th class="text-end">Cantidad</th>
+                    <th>Referencia</th>
+                    <th>Registró</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Filtrados)
+                {
+                    <tr>
+                        <td>@m.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            @if (m.EsEntrada)
+                            {
+                                <span class="badge text-bg-success"><span class="bi bi-arrow-down-circle"></span> Entrada</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-danger"><span class="bi bi-arrow-up-circle"></span> Salida</span>
+                            }
+                        </td>
+                        <td>@m.Cliente</td>
+                        <td><code>@m.Codigo</code></td>
+                        <td>@m.Producto</td>
+                        <td class="text-end fw-bold @(m.EsEntrada ? "text-success" : "text-danger")">
+                            @(m.EsEntrada ? "+" : "-")@m.Cantidad
+                        </td>
+                        <td>@m.Referencia</td>
+                        <td class="small text-muted">@m.RegistradoPor</td>
+                    </tr>
+                }
+                @if (Filtrados.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">Sin movimientos.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private record Movimiento(bool EsEntrada, DateTime Fecha, int ClienteId, string? Cliente, string? Codigo, string? Producto, int Cantidad, string? Referencia, string? RegistradoPor);
+
+    private List<Movimiento>? movimientos;
+    private Dictionary<int, string> clientes = new();
+    private string filtroTipo = "";
+    private int filtroCliente = 0;
+    private string busqueda = "";
+
+    private List<Movimiento> Filtrados => (movimientos ?? [])
+        .Where(m => filtroTipo == "" || (filtroTipo == "entrada" && m.EsEntrada) || (filtroTipo == "salida" && !m.EsEntrada))
+        .Where(m => filtroCliente == 0 || m.ClienteId == filtroCliente)
+        .Where(m => string.IsNullOrWhiteSpace(busqueda)
+            || (m.Codigo?.Contains(busqueda, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (m.Producto?.Contains(busqueda, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (m.Referencia?.Contains(busqueda, StringComparison.OrdinalIgnoreCase) ?? false))
+        .ToList();
+
+    protected override async Task OnInitializedAsync() => await CargarAsync();
+
+    private async Task CargarAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var entradas = await db.Entradas
+            .Include(e => e.Producto).ThenInclude(p => p!.Cliente)
+            .OrderByDescending(e => e.Fecha).Take(300)
+            .Select(e => new Movimiento(true, e.Fecha, e.Producto!.ClienteId, e.Producto.Cliente!.Nombre,
+                e.Producto.Codigo, e.Producto.Nombre, e.Cantidad, e.Referencia, e.RegistradoPor))
+            .ToListAsync();
+
+        var salidas = await db.Salidas
+            .Include(s => s.Producto).ThenInclude(p => p!.Cliente)
+            .OrderByDescending(s => s.Fecha).Take(300)
+            .Select(s => new Movimiento(false, s.Fecha, s.Producto!.ClienteId, s.Producto.Cliente!.Nombre,
+                s.Producto.Codigo, s.Producto.Nombre, s.Cantidad, s.Referencia, s.RegistradoPor))
+            .ToListAsync();
+
+        movimientos = entradas.Concat(salidas).OrderByDescending(m => m.Fecha).ToList();
+        clientes = movimientos
+            .GroupBy(m => m.ClienteId)
+            .ToDictionary(g => g.Key, g => g.First().Cliente ?? $"Cliente {g.Key}");
+    }
+}

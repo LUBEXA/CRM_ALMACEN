@@ -82,6 +82,11 @@ builder.Services.AddAuthorizationCore(options =>
     options.AddPolicy("EsCliente", p => p.RequireAuthenticatedUser()
         .RequireAssertion(ctx => ctx.User.ClienteId() is not null));
 
+    // Vista combinada de movimientos para el personal: requiere ver Entradas o Salidas.
+    options.AddPolicy("Ver:Movimientos", p => p.RequireAuthenticatedUser()
+        .RequireAssertion(ctx => ctx.User.EsPersonal() &&
+            (ctx.User.PuedeVer(ModuloApp.Entradas) || ctx.User.PuedeVer(ModuloApp.Salidas))));
+
     // El menú muestra la sección "Administración" si el usuario ve alguno de sus módulos.
     options.AddPolicy("VerAdministracion", p => p.RequireAuthenticatedUser()
         .RequireAssertion(ctx =>
