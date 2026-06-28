@@ -6,8 +6,22 @@
 
 <PageTitle>Movimientos - CRM Almacén</PageTitle>
 
-<h1>🔄 Movimientos</h1>
-<p class="text-muted">Historial combinado de entradas (mercancía que llegó al almacén) y salidas (mercancía entregada) de todos los clientes.</p>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+    <div>
+        <h1>🔄 Movimientos</h1>
+        <p class="text-muted">Historial combinado de entradas (mercancía que llegó al almacén) y salidas (mercancía entregada) de todos los clientes.</p>
+    </div>
+    <div class="d-flex gap-2">
+        @if (puedeEditarEntradas)
+        {
+            <a class="btn btn-success" href="entradas"><span class="bi bi-plus-lg"></span> Registrar entrada</a>
+        }
+        @if (puedeEditarSalidas)
+        {
+            <a class="btn btn-outline-secondary" href="salidas"><span class="bi bi-pencil"></span> Gestionar salidas</a>
+        }
+    </div>
+</div>
 
 @if (movimientos is null)
 {
@@ -82,8 +96,13 @@ else
 @code {
     private record Movimiento(bool EsEntrada, DateTime Fecha, int ClienteId, string? Cliente, string? Codigo, string? Producto, int Cantidad, string? Referencia, string? RegistradoPor);
 
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
     private List<Movimiento>? movimientos;
     private Dictionary<int, string> clientes = new();
+    private bool puedeEditarEntradas;
+    private bool puedeEditarSalidas;
     private string filtroTipo = "";
     private int filtroCliente = 0;
     private string busqueda = "";
@@ -97,7 +116,13 @@ else
             || (m.Referencia?.Contains(busqueda, StringComparison.OrdinalIgnoreCase) ?? false))
         .ToList();
 
-    protected override async Task OnInitializedAsync() => await CargarAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        puedeEditarEntradas = user.PuedeEditarModulo(ModuloApp.Entradas);
+        puedeEditarSalidas = user.PuedeEditarModulo(ModuloApp.Salidas);
+        await CargarAsync();
+    }
 
     private async Task CargarAsync()
     {
