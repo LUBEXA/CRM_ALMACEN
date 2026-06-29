@@ -1,6 +1,13 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager Navigation
 
+@* Control del menú lateral en móvil/tablet (cajón deslizable, CSS puro) *@
+<input type="checkbox" id="navmenu-toggle" class="navmenu-state" aria-hidden="true" />
+<label for="navmenu-toggle" class="navmenu-hamburger" title="Menú" aria-label="Abrir o cerrar menú">
+    <span class="bi bi-list"></span>
+</label>
+<label for="navmenu-toggle" class="navmenu-backdrop" aria-hidden="true"></label>
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />

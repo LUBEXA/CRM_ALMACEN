@@ -237,7 +237,10 @@ main {
     background: var(--azul-acento-2);
 }
 
-.navmenu-icon { display: none; }
+/* Controles del cajón móvil: ocultos en escritorio */
+.navmenu-state { display: none; }
+.navmenu-hamburger { display: none; }
+.navmenu-backdrop { display: none; }
 
 /* ---------- Menú contraído (solo iconos) ---------- */
 .sidebar:has(.sidebar-collapse-toggle:checked) {
@@ -461,6 +464,11 @@ main {
 }
 
 .form-control::placeholder { color: var(--texto-mute); }
+
+/* Blazor (FocusOnNavigate) enfoca el <h1> de cada página por accesibilidad.
+   Eso dibuja un recuadro al cargar; lo ocultamos solo en elementos enfocados
+   por programa (tabindex="-1"), sin afectar el foco visible de campos y botones. */
+[tabindex="-1"]:focus { outline: none; }
 
 .form-control:focus, .form-select:focus {
     border-color: var(--azul-acento);
@@ -811,8 +819,91 @@ main {
 *::-webkit-scrollbar-thumb:hover { background: #b3bccd; }
 
 /* ---------- Responsivo ---------- */
+
+/* Tablets y pantallas medianas: el menú arranca contraído (solo iconos),
+   ya cubierto por el estado por defecto; aquí afinamos el contenido. */
+@media (max-width: 1100px) {
+    .content { padding-top: 1.5rem; }
+}
+
+/* Móvil y tablet en vertical: el menú lateral se convierte en un cajón
+   deslizable que se abre con el botón hamburguesa y no empuja el contenido. */
 @media (max-width: 768px) {
-    .page { flex-direction: column; }
-    .sidebar { width: 100%; position: static; height: auto; overflow-y: visible; }
-    .content { padding-top: 1.25rem; }
+    /* Botón hamburguesa fijo arriba a la izquierda */
+    .navmenu-hamburger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        top: 11px;
+        left: 12px;
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        background: var(--azul-marca);
+        color: #fff;
+        font-size: 1.4rem;
+        cursor: pointer;
+        z-index: 1041;
+        box-shadow: var(--shadow-sm);
+    }
+
+    /* Dejar espacio para el botón en la barra superior */
+    .top-row { padding-left: 4rem; }
+
+    /* El menú lateral pasa a ser un cajón fuera de pantalla */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100vh;
+        width: 270px !important;
+        transform: translateX(-100%);
+        transition: transform .25s cubic-bezier(.4, 0, .2, 1);
+        z-index: 1046;
+        box-shadow: var(--shadow-lg);
+    }
+
+    /* Al marcar el checkbox, el cajón entra en pantalla */
+    .navmenu-state:checked ~ .page .sidebar {
+        transform: translateX(0);
+    }
+
+    /* Fondo oscuro detrás del cajón abierto (tocar fuera para cerrar) */
+    .navmenu-state:checked ~ .navmenu-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, .5);
+        z-index: 1044;
+    }
+
+    /* Dentro del cajón siempre se ve el menú completo, con texto,
+       aunque el estado "contraído" de escritorio esté activo. */
+    .sidebar .link-text { display: inline !important; }
+    .sidebar .sidebar-brand { justify-content: flex-start !important; padding: 1.25rem 1.25rem 1.1rem !important; }
+    .sidebar .navbar-brand { flex: 1 !important; gap: .6rem !important; }
+    .sidebar .sidebar-empresa { display: flex !important; }
+    .sidebar .sidebar-collapse-btn { display: none; }
+    .sidebar .nav-link { justify-content: flex-start !important; gap: .7rem !important; margin: .1rem .8rem !important; padding: .6rem .8rem !important; }
+    .sidebar .nav-section { color: #6b7793 !important; height: auto !important; border-top: none !important; margin: 0 !important; padding: 1.1rem 1.65rem .4rem !important; }
+
+    /* Más aire para tocar y menos margen lateral del contenido */
+    .content { padding-left: 1rem; padding-right: 1rem; padding-top: 1.25rem; }
+
+    /* Cualquier tabla se desplaza en horizontal en lugar de desbordar */
+    .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; width: 100%; }
+
+    /* Modales y paneles ocupan el ancho disponible */
+    .kanban-detalle { padding: 1.25rem 1rem; max-width: 100%; }
+    .user-menu-panel { position: fixed; left: 1rem; right: 1rem; top: 64px; min-width: 0; }
+    .user-menu-correo { max-width: 52vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Pantallas muy pequeñas: reducir tipografía de títulos */
+@media (max-width: 420px) {
+    h1 { font-size: 1.3rem; }
+    .content { padding-left: .75rem; padding-right: .75rem; }
+    .card-body { padding: 1rem; }
 }

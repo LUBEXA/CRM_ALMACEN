@@ -6,10 +6,16 @@
         if (cb) cb.checked = true;
     }
 
-    // Al elegir una opción del menú, volver a contraer.
+    function cerrarCajon() {
+        const cb = document.getElementById('navmenu-toggle');
+        if (cb) cb.checked = false;
+    }
+
+    // Al elegir una opción del menú, volver a contraer y cerrar el cajón móvil.
     document.addEventListener('click', function (e) {
         if (e.target && e.target.closest && e.target.closest('.sidebar .nav-link')) {
             contraer();
+            cerrarCajon();
         }
     });
 
