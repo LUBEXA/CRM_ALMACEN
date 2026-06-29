@@ -71,6 +71,13 @@
                         </div></div>
                     </div>
                 </div>
+
+                @* ----- Estatus de los pedidos del cliente (solo lectura) ----- *@
+                <div class="d-flex align-items-center justify-content-between mt-4 mb-3">
+                    <h2 class="h5 mb-0">Estatus de tus pedidos</h2>
+                    <span class="text-muted small">Haz clic en un pedido para ver el detalle</span>
+                </div>
+                <KanbanPedidos SoloLectura="true" ClienteId="@clienteId" />
             }
         }
     </Authorized>
@@ -83,6 +90,7 @@
     private bool cargando = true;
     private int totalProductos, totalExistencias, solicitudesPendientes;
     private int capacidadTotal, ocupadoTotal;
+    private int? clienteId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -106,7 +114,7 @@
             return;
         }
 
-        var clienteId = user.ClienteId();
+        clienteId = user.ClienteId();
         await using var db = await DbFactory.CreateDbContextAsync();
 
         var productos = db.Productos.Where(p => p.Activo);

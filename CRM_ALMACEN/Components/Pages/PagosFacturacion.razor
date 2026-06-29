@@ -51,9 +51,75 @@ else
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <h5 class="text-primary mb-0">Estado de cuenta <span class="text-muted fs-6">— @NombresMes.Get(PeriodoMes) @PeriodoAnio</span></h5>
-                <span class="badge fs-6 @EstadoClase">@EstadoTexto</span>
+                @if (puedeEditar || Liberado)
+                {
+                    <span class="badge fs-6 @EstadoClase">@EstadoTexto</span>
+                }
+                else
+                {
+                    <span class="badge fs-6 text-bg-secondary">En preparación</span>
+                }
             </div>
 
+            @* ---------- Corte de facturación y liberación al cliente ---------- *@
+            @if (puedeEditar)
+            {
+                <div class="border rounded p-3 mb-3 @(Liberado ? "bg-success-subtle" : "bg-light-subtle")">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Fecha de corte</label>
+                            <input type="date" class="form-control form-control-sm" @bind="fechaCorteEdit" />
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-sm btn-outline-secondary w-100" @onclick="GuardarFechaCorteAsync" disabled="@procesando">
+                                <span class="bi bi-calendar-check"></span> Guardar fecha
+                            </button>
+                        </div>
+                        <div class="col-md-5">
+                            @if (Liberado)
+                            {
+                                <button class="btn btn-sm btn-outline-danger w-100" @onclick="() => LiberarAsync(false)" disabled="@procesando">
+                                    <span class="bi bi-eye-slash"></span> Ocultar al cliente
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-success w-100" @onclick="() => LiberarAsync(true)" disabled="@procesando">
+                                    <span class="bi bi-unlock"></span> Liberar total al cliente
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <p class="small mb-0 mt-2 @(Liberado ? "text-success" : "text-muted")">
+                        @if (Liberado)
+                        {
+                            <span class="bi bi-check-circle"></span>
+                            <text> Liberado al cliente</text>
+                            @if (corte?.LiberadoEn is DateTime le) { <text> el @le.ToString("dd/MM/yyyy HH:mm")</text>; }
+                            <text>. Ya puede ver su estado de cuenta.</text>
+                        }
+                        else
+                        {
+                            <span class="bi bi-info-circle"></span>
+                            <text> El cliente NO ve este estado de cuenta hasta que presiones «Liberar total al cliente».</text>
+                        }
+                    </p>
+                </div>
+            }
+            else if (Liberado && corte?.FechaCorte is DateTime fcCli)
+            {
+                <p class="text-muted small mb-2"><span class="bi bi-calendar-check"></span> Estado de cuenta al corte del @fcCli.ToString("dd/MM/yyyy").</p>
+            }
+
+            @if (!puedeEditar && !Liberado)
+            {
+                <div class="alert alert-info mb-0">
+                    <span class="bi bi-hourglass-split"></span>
+                    Tu estado de cuenta de este periodo aún está en preparación. Estará disponible en cuanto el administrador establezca la fecha de corte y lo libere.
+                </div>
+            }
+            else
+            {
             <p class="text-muted small">Esto es lo que incluye tu servicio en este periodo:</p>
 
             <div class="table-responsive">
@@ -138,6 +204,7 @@ else
                     }
                 </table>
             </div>
+            }
 
             @if (puedeEditar)
             {
@@ -442,6 +509,11 @@ else
     private List<Pago> pagosPeriodo = [];
     private List<Pago> pagosTodos = [];
 
+    // Corte / liberación del periodo seleccionado.
+    private CorteFacturacion? corte;
+    private DateTime fechaCorteEdit;
+    private bool Liberado => corte?.Liberado ?? false;
+
     private Cargo nuevoCargo = new();
     private Pago nuevoPago = new() { Fecha = DateTime.Now };
     private bool subiendo;
@@ -540,6 +612,63 @@ else
         pagosPeriodo = await db.Pagos
             .Where(p => p.ClienteId == id && p.Anio == PeriodoAnio && p.Mes == PeriodoMes)
             .OrderByDescending(p => p.Fecha).ToListAsync();
+
+        corte = await db.CortesFacturacion
+            .FirstOrDefaultAsync(c => c.ClienteId == id && c.Anio == PeriodoAnio && c.Mes == PeriodoMes);
+        // Por defecto, la fecha de corte propuesta es el último día del periodo.
+        fechaCorteEdit = corte?.FechaCorte
+            ?? new DateTime(PeriodoAnio, PeriodoMes, DateTime.DaysInMonth(PeriodoAnio, PeriodoMes));
+    }
+
+    /// <summary>Obtiene el corte del periodo o crea uno nuevo (sin guardar aún).</summary>
+    private async Task<CorteFacturacion> ObtenerOCrearCorteAsync(ApplicationDbContext db, int id)
+    {
+        var c = await db.CortesFacturacion
+            .FirstOrDefaultAsync(x => x.ClienteId == id && x.Anio == PeriodoAnio && x.Mes == PeriodoMes);
+        if (c is null)
+        {
+            c = new CorteFacturacion { ClienteId = id, Anio = PeriodoAnio, Mes = PeriodoMes };
+            db.CortesFacturacion.Add(c);
+        }
+        return c;
+    }
+
+    private async Task GuardarFechaCorteAsync()
+    {
+        if (clienteId is not int id) return;
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var c = await ObtenerOCrearCorteAsync(db, id);
+            c.FechaCorte = fechaCorteEdit;
+            await db.SaveChangesAsync();
+            mensajeCargos = "Fecha de corte guardada.";
+            await CargarPeriodoAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task LiberarAsync(bool liberar)
+    {
+        if (clienteId is not int id) return;
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var c = await ObtenerOCrearCorteAsync(db, id);
+            // Al liberar, conservar la fecha de corte capturada en pantalla si no había una.
+            if (liberar && c.FechaCorte is null) c.FechaCorte = fechaCorteEdit;
+            c.Liberado = liberar;
+            c.LiberadoEn = liberar ? DateTime.Now : null;
+            c.LiberadoPor = liberar ? usuario : null;
+            await db.SaveChangesAsync();
+            mensajeCargos = liberar
+                ? "Estado de cuenta liberado: el cliente ya puede verlo."
+                : "Estado de cuenta oculto al cliente.";
+            await CargarPeriodoAsync();
+        }
+        finally { procesando = false; }
     }
 
     private async Task GenerarDesdeTarifarioAsync()

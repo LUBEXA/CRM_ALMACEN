@@ -20,6 +20,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Cargo> Cargos => Set<Cargo>();
     public DbSet<Pago> Pagos => Set<Pago>();
     public DbSet<CostoServicio> CostosServicio => Set<CostoServicio>();
+    public DbSet<CorteFacturacion> CortesFacturacion => Set<CorteFacturacion>();
     public DbSet<Servicio> Servicios => Set<Servicio>();
     public DbSet<Ubicacion> Ubicaciones => Set<Ubicacion>();
     public DbSet<Gasto> Gastos => Set<Gasto>();
@@ -85,6 +86,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<Pago>()
             .HasOne(p => p.Cliente).WithMany()
             .HasForeignKey(p => p.ClienteId).OnDelete(DeleteBehavior.Cascade);
+
+        // Corte de facturación: uno por cliente y periodo
+        builder.Entity<CorteFacturacion>()
+            .HasIndex(c => new { c.ClienteId, c.Anio, c.Mes }).IsUnique();
+        builder.Entity<CorteFacturacion>()
+            .HasOne(c => c.Cliente).WithMany()
+            .HasForeignKey(c => c.ClienteId).OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<CostoServicio>().Property(c => c.ImporteNeto).HasPrecision(12, 2);
 
