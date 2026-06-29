@@ -1,0 +1,439 @@
+@page "/finanzas"
+@attribute [Authorize(Policy = "Ver:Finanzas")]
+@rendermode InteractiveServer
+@using System.Globalization
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Finanzas - CRM Almacén</PageTitle>
+
+<h1>💰 Finanzas</h1>
+<p class="text-muted">El corazón del negocio: cuánto cobraste, cuánto te falta por cobrar y quién te debe.</p>
+
+@* ---------- Filtros ---------- *@
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold">Año</label>
+                <select class="form-select" @bind="anio" @bind:after="CargarAsync">
+                    @foreach (var a in aniosDisponibles)
+                    {
+                        <option value="@a">@a</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold">Desde mes</label>
+                <select class="form-select" @bind="mesDesde" @bind:after="CargarAsync">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        <option value="@m">@NombresMes.Get(m)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold">Hasta mes</label>
+                <select class="form-select" @bind="mesHasta" @bind:after="CargarAsync">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        <option value="@m">@NombresMes.Get(m)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold">Cliente</label>
+                <select class="form-select" @bind="clienteFiltro" @bind:after="CargarAsync">
+                    <option value="0">Todos los clientes</option>
+                    @foreach (var c in clientes)
+                    {
+                        <option value="@c.Id">@c.Nombre</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <p class="text-muted small mb-0 mt-2">
+            Mostrando @NombresMes.Get(mesDesde) – @NombresMes.Get(mesHasta) de @anio.
+        </p>
+    </div>
+</div>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    @* ---------- KPIs ---------- *@
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg">
+            <div class="card text-bg-success h-100"><div class="card-body">
+                <h6 class="card-title">Cobrado</h6>
+                <p class="h4 mb-0">@Money(totalCobrado)</p>
+                <small>dinero que ya entró</small>
+            </div></div>
+        </div>
+        @if (MostrarUtilidad)
+        {
+            <div class="col-6 col-lg">
+                <div class="card text-bg-dark h-100"><div class="card-body">
+                    <h6 class="card-title">Gastos</h6>
+                    <p class="h4 mb-0">@Money(totalGastos)</p>
+                    <small>lo que salió</small>
+                </div></div>
+            </div>
+            <div class="col-6 col-lg">
+                <div class="card h-100 @(UtilidadNeta >= 0 ? "text-bg-success" : "text-bg-danger")"><div class="card-body">
+                    <h6 class="card-title">Utilidad neta</h6>
+                    <p class="h4 mb-0">@Money(UtilidadNeta)</p>
+                    <small>@(UtilidadNeta >= 0 ? "ganancia 🎉" : "pérdida ⚠️") (cobrado − gastos)</small>
+                </div></div>
+            </div>
+        }
+        <div class="col-6 col-lg">
+            <div class="card text-bg-primary h-100"><div class="card-body">
+                <h6 class="card-title">Facturado</h6>
+                <p class="h4 mb-0">@Money(totalFacturado)</p>
+                <small>lo que debiste cobrar</small>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="card h-100 @(totalPendiente > 0 ? "text-bg-danger" : "text-bg-secondary")"><div class="card-body">
+                <h6 class="card-title">Por cobrar</h6>
+                <p class="h4 mb-0">@Money(totalPendiente)</p>
+                <small>@deudores.Count cliente(s) deben</small>
+            </div></div>
+        </div>
+    </div>
+
+    @* ---------- Gráfica: cobrado vs facturado por mes ---------- *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="text-primary mb-1">Movimiento por mes — @anio</h5>
+            <p class="text-muted small">
+                <span class="badge text-bg-primary">Facturado</span>
+                <span class="badge text-bg-success">Cobrado</span>
+                @if (MostrarUtilidad)
+                {
+                    <span class="badge text-bg-dark">Gastos</span>
+                }
+                (todo el año, sin importar el rango de meses)
+            </p>
+            @{
+                var maxMes = (double)Math.Max(1m, Math.Max(
+                    Math.Max(porMesCobrado.Max(), porMesFacturado.Max()),
+                    MostrarUtilidad ? porMesGastos.Max() : 0m));
+                const int gw = 720, gh = 260, padL = 60, padB = 28, padT = 10;
+                var plotH = gh - padB - padT;
+                var slot = (gw - padL) / 12.0;
+                var barW = MostrarUtilidad ? slot * 0.24 : slot * 0.32;
+            }
+            <div style="overflow-x:auto">
+                <svg viewBox="0 0 @gw @gh" style="min-width:680px;width:100%;height:auto;font-family:inherit">
+                    @* líneas de referencia *@
+                    @for (int g = 0; g <= 4; g++)
+                    {
+                        var y = padT + plotH - plotH * g / 4.0;
+                        var val = maxMes * g / 4.0;
+                        <line x1="@padL" y1="@F(y)" x2="@gw" y2="@F(y)" stroke="var(--bs-border-color)" stroke-width="1" />
+                        <svg:text x="@(padL - 6)" y="@F(y + 4)" text-anchor="end" font-size="10" fill="var(--bs-secondary-color)">@($"{val/1000:0.#}k")</svg:text>
+                    }
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        var x0 = padL + slot * (m - 1) + slot / 2;
+                        var cob = (double)porMesCobrado[m - 1];
+                        var fac = (double)porMesFacturado[m - 1];
+                        var gas = (double)porMesGastos[m - 1];
+                        var hCob = plotH * cob / maxMes;
+                        var hFac = plotH * fac / maxMes;
+                        var hGas = plotH * gas / maxMes;
+                        var bx = MostrarUtilidad ? x0 - barW * 1.5 - 1 : x0 - barW - 1;
+                        <rect x="@F(bx)" y="@F(padT + plotH - hFac)" width="@F(barW)" height="@F(hFac)" rx="2" fill="var(--bs-primary)" opacity="0.7">
+                            <title>@NombresMes.Get(m): facturado @Money(porMesFacturado[m-1])</title>
+                        </rect>
+                        <rect x="@F(bx + barW + 1)" y="@F(padT + plotH - hCob)" width="@F(barW)" height="@F(hCob)" rx="2" fill="var(--bs-success)">
+                            <title>@NombresMes.Get(m): cobrado @Money(porMesCobrado[m-1])</title>
+                        </rect>
+                        @if (MostrarUtilidad)
+                        {
+                            <rect x="@F(bx + (barW + 1) * 2)" y="@F(padT + plotH - hGas)" width="@F(barW)" height="@F(hGas)" rx="2" fill="var(--bs-dark)">
+                                <title>@NombresMes.Get(m): gastos @Money(porMesGastos[m-1])</title>
+                            </rect>
+                        }
+                        <svg:text x="@F(x0)" y="@(gh - 8)" text-anchor="middle" font-size="10" fill="var(--bs-secondary-color)">@NombresMes.Get(m).Substring(0, 3)</svg:text>
+                    }
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    @* ---------- Cobrado por semana (dentro del rango) ---------- *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="text-primary mb-1">Cobrado por semana</h5>
+            <p class="text-muted small">Semanas dentro del rango seleccionado.</p>
+            @if (porSemana.Count == 0)
+            {
+                <p class="text-muted"><em>Sin cobros en este rango.</em></p>
+            }
+            else
+            {
+                var maxSem = (double)Math.Max(1m, porSemana.Max(s => s.Monto));
+                <div class="d-flex align-items-end gap-1" style="height:160px;overflow-x:auto">
+                    @foreach (var s in porSemana)
+                    {
+                        var h = 140 * (double)s.Monto / maxSem;
+                        <div class="text-center" style="min-width:42px" title="@s.Etiqueta: @Money(s.Monto)">
+                            <div class="bg-success rounded-top mx-auto" style="width:24px;height:@(F(h))px"></div>
+                            <small class="text-muted" style="font-size:.65rem">@s.EtiquetaCorta</small>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ---------- Gastos por categoría ---------- *@
+    @if (MostrarUtilidad && porCategoria.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="text-dark mb-3"><span class="bi bi-pie-chart"></span> En qué se va el dinero (gastos por categoría)</h5>
+                @{
+                    var maxCat = (double)Math.Max(1m, porCategoria.Max(c => c.Monto));
+                }
+                <div class="vstack gap-2">
+                    @foreach (var c in porCategoria)
+                    {
+                        var pct = 100 * (double)c.Monto / maxCat;
+                        var pctTotal = totalGastos == 0 ? 0 : 100 * (double)c.Monto / (double)totalGastos;
+                        <div>
+                            <div class="d-flex justify-content-between small">
+                                <span>@c.Nombre</span>
+                                <span class="fw-semibold">@Money(c.Monto) <span class="text-muted">(@pctTotal.ToString("0")%)</span></span>
+                            </div>
+                            <div class="progress" style="height:8px">
+                                <div class="progress-bar bg-dark" style="width:@F(pct)%"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row g-4">
+        @* ---------- Clientes que faltan por pagar ---------- *@
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="text-danger mb-3"><span class="bi bi-exclamation-triangle"></span> Clientes que te deben</h5>
+                    @if (deudores.Count == 0)
+                    {
+                        <div class="alert alert-success mb-0">¡Todo cobrado! Nadie tiene saldo pendiente en este rango.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0">
+                                <thead><tr>
+                                    <th>Cliente</th>
+                                    <th class="text-end">Facturado</th>
+                                    <th class="text-end">Cobrado</th>
+                                    <th class="text-end">Debe</th>
+                                </tr></thead>
+                                <tbody>
+                                    @foreach (var d in deudores)
+                                    {
+                                        <tr>
+                                            <td>@d.Nombre</td>
+                                            <td class="text-end">@Money(d.Facturado)</td>
+                                            <td class="text-end text-success">@Money(d.Cobrado)</td>
+                                            <td class="text-end fw-bold text-danger">@Money(d.Saldo)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="periodo-total">
+                                        <td class="fw-bold">Total por cobrar</td>
+                                        <td></td><td></td>
+                                        <td class="text-end fw-bold text-danger">@Money(deudores.Sum(d => d.Saldo))</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ---------- Ingresos por cliente ---------- *@
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="text-success mb-3"><span class="bi bi-trophy"></span> Quién te deja más (cobrado)</h5>
+                    @if (porCliente.Count == 0)
+                    {
+                        <p class="text-muted"><em>Sin cobros en este rango.</em></p>
+                    }
+                    else
+                    {
+                        var maxCli = (double)Math.Max(1m, porCliente.Max(c => c.Cobrado));
+                        <div class="vstack gap-2">
+                            @foreach (var c in porCliente)
+                            {
+                                var pct = 100 * (double)c.Cobrado / maxCli;
+                                <div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-truncate" style="max-width:60%">@c.Nombre</span>
+                                        <span class="fw-semibold">@Money(c.Cobrado)</span>
+                                    </div>
+                                    <div class="progress" style="height:8px">
+                                        <div class="progress-bar bg-success" style="width:@F(pct)%"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-4 small mb-0">
+        <span class="bi bi-info-circle"></span>
+        <strong>Utilidad neta = Cobrado − Gastos.</strong>
+        @if (MostrarUtilidad)
+        {
+            <text> Para que el cálculo sea fiel, registra tus gastos del mes en </text>
+            <a href="gastos" class="alert-link">Gastos</a><text>. La utilidad usa lo realmente cobrado (no lo facturado).</text>
+        }
+        else
+        {
+            <text> Estás filtrando por un cliente: aquí solo se ven sus ingresos. Los gastos son del negocio, así que la utilidad neta se muestra al elegir «Todos los clientes».</text>
+        }
+    </div>
+}
+
+@code {
+    private bool cargando = true;
+
+    private int anio = DateTime.Now.Year;
+    private int mesDesde = 1;
+    private int mesHasta = 12;
+    private int clienteFiltro;
+
+    private List<int> aniosDisponibles = [];
+    private List<Cliente> clientes = [];
+
+    private decimal totalCobrado, totalFacturado, totalPendiente, totalGastos;
+    private decimal UtilidadNeta => totalCobrado - totalGastos;
+    private bool MostrarUtilidad => clienteFiltro == 0; // los gastos son del negocio, no por cliente
+    private readonly decimal[] porMesCobrado = new decimal[12];
+    private readonly decimal[] porMesFacturado = new decimal[12];
+    private readonly decimal[] porMesGastos = new decimal[12];
+    private List<GastoCat> porCategoria = [];
+
+    private record GastoCat(string Nombre, decimal Monto);
+
+    private List<SemanaDato> porSemana = [];
+    private List<ClienteDato> porCliente = [];
+    private List<ClienteDato> deudores = [];
+
+    private record SemanaDato(string Etiqueta, string EtiquetaCorta, decimal Monto);
+    private record ClienteDato(int Id, string Nombre, decimal Facturado, decimal Cobrado)
+    {
+        public decimal Saldo => Facturado - Cobrado;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        clientes = await db.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+
+        var aniosPagos = await db.Pagos.Select(p => p.Anio).Distinct().ToListAsync();
+        var aniosCargos = await db.Cargos.Select(c => c.Anio).Distinct().ToListAsync();
+        aniosDisponibles = aniosPagos.Concat(aniosCargos).Append(DateTime.Now.Year)
+            .Distinct().OrderByDescending(a => a).ToList();
+
+        mesHasta = DateTime.Now.Month;
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        cargando = true;
+        if (mesDesde > mesHasta) (mesDesde, mesHasta) = (mesHasta, mesDesde);
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var pagosQ = db.Pagos.Where(p => p.Anio == anio);
+        var cargosQ = db.Cargos.Where(c => c.Anio == anio);
+        if (clienteFiltro != 0)
+        {
+            pagosQ = pagosQ.Where(p => p.ClienteId == clienteFiltro);
+            cargosQ = cargosQ.Where(c => c.ClienteId == clienteFiltro);
+        }
+
+        var pagos = await pagosQ.ToListAsync();
+        var cargos = await cargosQ.ToListAsync();
+        // Los gastos son del negocio (no por cliente); solo aplican con "Todos los clientes".
+        var gastos = MostrarUtilidad
+            ? await db.Gastos.Where(g => g.Anio == anio).ToListAsync()
+            : [];
+
+        // Gráfica anual completa (los 12 meses).
+        Array.Clear(porMesCobrado);
+        Array.Clear(porMesFacturado);
+        Array.Clear(porMesGastos);
+        foreach (var p in pagos) porMesCobrado[p.Mes - 1] += p.Monto;
+        foreach (var c in cargos) porMesFacturado[c.Mes - 1] += c.Monto;
+        foreach (var g in gastos) porMesGastos[g.Mes - 1] += g.Monto;
+
+        // Datos del rango de meses seleccionado.
+        var pagosR = pagos.Where(p => p.Mes >= mesDesde && p.Mes <= mesHasta).ToList();
+        var cargosR = cargos.Where(c => c.Mes >= mesDesde && c.Mes <= mesHasta).ToList();
+
+        var gastosR = gastos.Where(g => g.Mes >= mesDesde && g.Mes <= mesHasta).ToList();
+
+        totalCobrado = pagosR.Sum(p => p.Monto);
+        totalFacturado = cargosR.Sum(c => c.Monto);
+        totalPendiente = Math.Max(0, totalFacturado - totalCobrado);
+        totalGastos = gastosR.Sum(g => g.Monto);
+
+        porCategoria = gastosR
+            .GroupBy(g => g.Categoria)
+            .Select(g => new GastoCat(Gasto.CategoriaNombre(g.Key), g.Sum(x => x.Monto)))
+            .OrderByDescending(c => c.Monto)
+            .ToList();
+
+        // Cobrado por semana (por fecha real del pago).
+        var cal = CultureInfo.InvariantCulture.Calendar;
+        porSemana = pagosR
+            .GroupBy(p => cal.GetWeekOfYear(p.Fecha, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday))
+            .OrderBy(g => g.Key)
+            .Select(g =>
+            {
+                var ini = g.Min(p => p.Fecha);
+                return new SemanaDato($"Semana del {ini:dd/MM/yyyy}", ini.ToString("dd/MM"), g.Sum(p => p.Monto));
+            })
+            .ToList();
+
+        // Por cliente: facturado y cobrado en el rango.
+        var nombre = clientes.ToDictionary(c => c.Id, c => c.Nombre);
+        var ids = cargosR.Select(c => c.ClienteId).Concat(pagosR.Select(p => p.ClienteId)).Distinct();
+        var datos = ids.Select(id => new ClienteDato(
+            id,
+            nombre.GetValueOrDefault(id, $"Cliente #{id}"),
+            cargosR.Where(c => c.ClienteId == id).Sum(c => c.Monto),
+            pagosR.Where(p => p.ClienteId == id).Sum(p => p.Monto))).ToList();
+
+        porCliente = datos.Where(d => d.Cobrado > 0).OrderByDescending(d => d.Cobrado).ToList();
+        deudores = datos.Where(d => d.Saldo > 0).OrderByDescending(d => d.Saldo).ToList();
+
+        cargando = false;
+    }
+
+    private static string Money(decimal m) => $"${m:N2}";
+    private static string F(double d) => d.ToString("0.##", CultureInfo.InvariantCulture);
+}

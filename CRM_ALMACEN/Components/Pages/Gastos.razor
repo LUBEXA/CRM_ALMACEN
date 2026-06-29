@@ -1,0 +1,277 @@
+@page "/gastos"
+@attribute [Authorize(Policy = "Ver:Gastos")]
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Gastos - CRM Almacén</PageTitle>
+
+<h1>🧾 Gastos</h1>
+<p class="text-muted">Registra lo que gasta el negocio (renta, sueldos, luz, etc.). Con esto, Finanzas calcula tu utilidad neta.</p>
+
+@* ---------- Filtro de periodo ---------- *@
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold">Año</label>
+                <select class="form-select" @bind="anio" @bind:after="CargarAsync">
+                    @foreach (var a in aniosDisponibles)
+                    {
+                        <option value="@a">@a</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold">Mes</label>
+                <select class="form-select" @bind="mes" @bind:after="CargarAsync">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        <option value="@m">@NombresMes.Get(m)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-6 text-md-end">
+                <span class="text-muted">Total de @NombresMes.Get(mes) @anio:</span>
+                <span class="h4 ms-2 text-danger">@Money(gastos.Sum(g => g.Monto))</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    @* ---------- Lista de gastos ---------- *@
+    <div class="card mb-4">
+        <div class="card-body p-4">
+            <h5 class="text-primary mb-3">Gastos de @NombresMes.Get(mes) @anio</h5>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Concepto</th>
+                            <th>Categoría</th>
+                            <th>Nota</th>
+                            <th class="text-end">Monto</th>
+                            @if (puedeEditar) { <th></th> }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var g in gastos)
+                        {
+                            var gasto = g;
+                            <tr>
+                                @if (puedeEditar)
+                                {
+                                    <td style="min-width:160px"><input type="date" class="form-control form-control-sm" @bind="gasto.Fecha" /></td>
+                                    <td style="min-width:160px"><input class="form-control form-control-sm" @bind="gasto.Concepto" /></td>
+                                    <td style="min-width:150px">
+                                        <select class="form-select form-select-sm" @bind="gasto.Categoria">
+                                            @foreach (var c in Enum.GetValues<CategoriaGasto>())
+                                            {
+                                                <option value="@c">@Gasto.CategoriaNombre(c)</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td style="min-width:160px"><input class="form-control form-control-sm" @bind="gasto.Nota" placeholder="Opcional" /></td>
+                                    <td style="max-width:140px">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" step="0.01" min="0" class="form-control text-end" @bind="gasto.Monto" />
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(gasto.Id)" title="Eliminar"><span class="bi bi-trash"></span></button>
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td>@gasto.Fecha.ToString("dd/MM/yyyy")</td>
+                                    <td>@gasto.Concepto</td>
+                                    <td><span class="badge text-bg-light text-muted">@gasto.CategoriaTexto</span></td>
+                                    <td>@(string.IsNullOrEmpty(gasto.Nota) ? "—" : gasto.Nota)</td>
+                                    <td class="text-end fw-semibold">@Money(gasto.Monto)</td>
+                                }
+                            </tr>
+                        }
+                        @if (gastos.Count == 0)
+                        {
+                            <tr><td colspan="@(puedeEditar ? 6 : 5)" class="text-center text-muted py-3">Sin gastos en este periodo.</td></tr>
+                        }
+                    </tbody>
+                    @if (gastos.Count > 0)
+                    {
+                        <tfoot>
+                            <tr class="periodo-total">
+                                <td class="fw-bold" colspan="4">Total del mes</td>
+                                <td class="text-end fw-bold text-danger">@Money(gastos.Sum(g => g.Monto))</td>
+                                @if (puedeEditar) { <td></td> }
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+
+            @if (puedeEditar && gastos.Count > 0)
+            {
+                <button class="btn btn-sm btn-primary" @onclick="GuardarCambiosAsync" disabled="@procesando">
+                    <span class="bi bi-save"></span> Guardar cambios
+                </button>
+                @if (mensaje is not null) { <span class="text-success ms-2 small">@mensaje</span> }
+            }
+        </div>
+    </div>
+
+    @if (puedeEditar)
+    {
+        @* ---------- Registrar gasto ---------- *@
+        <div class="card mb-4">
+            <div class="card-body p-4">
+                <h6 class="mb-3">Registrar gasto</h6>
+                <div class="row g-2 align-items-end">
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small">Fecha</label>
+                        <input type="date" class="form-control form-control-sm" @bind="nuevo.Fecha" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small">Concepto</label>
+                        <input class="form-control form-control-sm" @bind="nuevo.Concepto" placeholder="Ej. Renta de bodega" />
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small">Categoría</label>
+                        <select class="form-select form-select-sm" @bind="nuevo.Categoria">
+                            @foreach (var c in Enum.GetValues<CategoriaGasto>())
+                            {
+                                <option value="@c">@Gasto.CategoriaNombre(c)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small">Monto (MXN)</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm" @bind="nuevo.Monto" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small">Nota (opcional)</label>
+                        <input class="form-control form-control-sm" @bind="nuevo.Nota" />
+                    </div>
+                    <div class="col-12 mt-2">
+                        <button class="btn btn-sm btn-success" @onclick="AgregarAsync" disabled="@procesando">+ Agregar gasto</button>
+                        <span class="text-muted small ms-2">Se registra en @NombresMes.Get(nuevo.Fecha.Month) @nuevo.Fecha.Year (según la fecha).</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private bool puedeEditar;
+    private bool cargando = true;
+    private bool procesando;
+    private string? usuario;
+    private string? mensaje;
+
+    private int anio = DateTime.Now.Year;
+    private int mes = DateTime.Now.Month;
+    private List<int> aniosDisponibles = [];
+
+    private List<Gasto> gastos = [];
+    private Gasto nuevo = new() { Fecha = DateTime.Now };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateTask).User;
+        puedeEditar = user.PuedeEditarModulo(ModuloApp.Gastos);
+        usuario = user.Identity?.Name;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var anios = await db.Gastos.Select(g => g.Anio).Distinct().ToListAsync();
+        aniosDisponibles = anios.Append(DateTime.Now.Year).Distinct().OrderByDescending(a => a).ToList();
+
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        cargando = true;
+        mensaje = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        gastos = await db.Gastos
+            .Where(g => g.Anio == anio && g.Mes == mes)
+            .OrderByDescending(g => g.Fecha).ToListAsync();
+        cargando = false;
+    }
+
+    private async Task AgregarAsync()
+    {
+        if (string.IsNullOrWhiteSpace(nuevo.Concepto) || nuevo.Monto <= 0) return;
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Gastos.Add(new Gasto
+            {
+                Fecha = nuevo.Fecha,
+                Anio = nuevo.Fecha.Year,
+                Mes = nuevo.Fecha.Month,
+                Concepto = nuevo.Concepto.Trim(),
+                Categoria = nuevo.Categoria,
+                Monto = nuevo.Monto,
+                Nota = nuevo.Nota,
+                RegistradoPor = usuario
+            });
+            await db.SaveChangesAsync();
+            // Salta al periodo del gasto recién creado para que se vea.
+            anio = nuevo.Fecha.Year;
+            mes = nuevo.Fecha.Month;
+            if (!aniosDisponibles.Contains(anio))
+                aniosDisponibles = aniosDisponibles.Append(anio).OrderByDescending(a => a).ToList();
+            nuevo = new() { Fecha = DateTime.Now };
+            await CargarAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task GuardarCambiosAsync()
+    {
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            foreach (var g in gastos)
+            {
+                g.Concepto = g.Concepto.Trim();
+                g.Anio = g.Fecha.Year;
+                g.Mes = g.Fecha.Month;
+                db.Gastos.Update(g);
+            }
+            await db.SaveChangesAsync();
+            mensaje = "Cambios guardados.";
+            await CargarAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task EliminarAsync(int id)
+    {
+        procesando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var g = await db.Gastos.FindAsync(id);
+            if (g is not null) { db.Gastos.Remove(g); await db.SaveChangesAsync(); }
+            await CargarAsync();
+        }
+        finally { procesando = false; }
+    }
+
+    private static string Money(decimal m) => $"${m:N2}";
+}

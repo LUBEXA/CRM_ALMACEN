@@ -80,6 +80,11 @@ a:hover { color: var(--azul-acento-2); }
     flex-direction: column;
     transition: width .22s cubic-bezier(.4, 0, .2, 1);
     border-right: 1px solid rgba(255, 255, 255, .04);
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 main {
@@ -808,6 +813,6 @@ main {
 /* ---------- Responsivo ---------- */
 @media (max-width: 768px) {
     .page { flex-direction: column; }
-    .sidebar { width: 100%; }
+    .sidebar { width: 100%; position: static; height: auto; overflow-y: visible; }
     .content { padding-top: 1.25rem; }
 }

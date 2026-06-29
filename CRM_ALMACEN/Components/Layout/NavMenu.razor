@@ -29,15 +29,24 @@
                 <span class="bi bi-house-door-fill" aria-hidden="true"></span> <span class="link-text">Inicio</span>
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="perfil" title="Perfil">
-                <span class="bi bi-person-badge" aria-hidden="true"></span> <span class="link-text">Perfil</span>
-            </NavLink>
-        </div>
+        <AuthorizeView Policy="EsCliente">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="perfil" title="Perfil">
+                    <span class="bi bi-person-badge" aria-hidden="true"></span> <span class="link-text">Perfil</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
         <AuthorizeView Policy="Ver:Pagos">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="pagos" title="Pagos y Facturación">
                     <span class="bi bi-credit-card-2-front" aria-hidden="true"></span> <span class="link-text">Pagos y Facturación</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:Finanzas">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="finanzas" title="Finanzas (cobros del negocio)">
+                    <span class="bi bi-graph-up-arrow" aria-hidden="true"></span> <span class="link-text">Finanzas</span>
                 </NavLink>
             </div>
         </AuthorizeView>
@@ -109,6 +118,13 @@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="lista-precios" title="Lista de precios">
                     <span class="bi bi-cash-stack" aria-hidden="true"></span> <span class="link-text">Lista de precios</span>
+                </NavLink>
+            </div>
+        </AuthorizeView>
+        <AuthorizeView Policy="Ver:Gastos">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="gastos" title="Gastos del negocio">
+                    <span class="bi bi-receipt" aria-hidden="true"></span> <span class="link-text">Gastos</span>
                 </NavLink>
             </div>
         </AuthorizeView>

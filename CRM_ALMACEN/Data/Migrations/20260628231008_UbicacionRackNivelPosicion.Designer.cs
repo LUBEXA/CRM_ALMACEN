@@ -3,6 +3,7 @@ using System;
 using CRM_ALMACEN.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CRM_ALMACEN.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260628231008_UbicacionRackNivelPosicion")]
+    partial class UbicacionRackNivelPosicion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -308,48 +311,6 @@ namespace CRM_ALMACEN.Data.Migrations
                     b.HasIndex("UbicacionId");
 
                     b.ToTable("Entradas");
-                });
-
-            modelBuilder.Entity("CRM_ALMACEN.Models.Gasto", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("Anio")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Categoria")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Concepto")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<DateTime>("Fecha")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("Mes")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Monto")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)");
-
-                    b.Property<string>("Nota")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<string>("RegistradoPor")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Gastos");
                 });
 
             modelBuilder.Entity("CRM_ALMACEN.Models.Pago", b =>

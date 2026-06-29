@@ -74,6 +74,43 @@ public static class DbSeeder
             await userManager.AddToRoleAsync(admin, RolAdmin);
         }
 
+        // 3.5 Mapa del almacén: ubicaciones (racks/niveles/posiciones).
+        // Se crea la primera vez si todavía no hay ninguna. Layout de ejemplo:
+        // 4 caras de rack (A, B = Pasillo 1; C, D = Pasillo 2), 3 niveles, 50 posiciones.
+        if (!await db.Ubicaciones.AnyAsync())
+        {
+            var racks = new[]
+            {
+                (Rack: "A", Zona: "Pasillo 1"),
+                (Rack: "B", Zona: "Pasillo 1"),
+                (Rack: "C", Zona: "Pasillo 2"),
+                (Rack: "D", Zona: "Pasillo 2"),
+            };
+            const int niveles = 3;
+            const int posiciones = 50;
+
+            foreach (var (rack, zona) in racks)
+            {
+                for (var nivel = 1; nivel <= niveles; nivel++)
+                {
+                    for (var pos = 1; pos <= posiciones; pos++)
+                    {
+                        db.Ubicaciones.Add(new Ubicacion
+                        {
+                            Zona = zona,
+                            Rack = rack,
+                            Nivel = nivel,
+                            Posicion = pos,
+                            Codigo = Ubicacion.ArmarCodigo(rack, nivel, pos),
+                            Capacidad = 1,
+                            Activo = true
+                        });
+                    }
+                }
+            }
+            await db.SaveChangesAsync();
+        }
+
         // Datos de ejemplo (cliente demo, pagos, pedido) DESACTIVADOS para operar
         // con datos reales. Cambia a true si quieres volver a sembrar el demo.
         var sembrarDatosDemo = false;

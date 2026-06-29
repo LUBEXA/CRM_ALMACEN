@@ -38,31 +38,111 @@
 @if (puedeEditar && mostrarFormulario)
 {
 <div class="card mb-4">
-    <div class="card-header">Agregar ubicación</div>
-    <div class="card-body">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label">Zona / Pasillo</label>
-                <input class="form-control" @bind="nuevaZona" placeholder="Ej. Pasillo 3" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Código de posición</label>
-                <input class="form-control" @bind="nuevoCodigo" placeholder="Ej. P3-RB-N2" />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Cupo (tarimas/productos)</label>
-                <input type="number" min="1" class="form-control" @bind="nuevaCapacidad" />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Notas</label>
-                <input class="form-control" @bind="nuevasNotas" placeholder="Opcional" />
-            </div>
-            <div class="col-md-2">
-                <button class="btn btn-primary w-100" @onclick="AgregarAsync" disabled="@guardando">
-                    <span class="bi bi-plus-lg"></span> Agregar
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs">
+            <li class="nav-item">
+                <button class="nav-link @(modoGenerador ? "" : "active")" @onclick="() => modoGenerador = false">
+                    Agregar una posición
                 </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(modoGenerador ? "active" : "")" @onclick="() => modoGenerador = true">
+                    Generar varias (rack completo)
+                </button>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        @if (!modoGenerador)
+        {
+            <p class="text-muted small mb-3">Usa esto para dar de alta <strong>un solo hueco</strong>. Si vas a capturar un rack entero, usa la otra pestaña.</p>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">¿En qué pasillo está?</label>
+                    <input class="form-control" @bind="nuevaZona" placeholder="Ej. Pasillo 1" />
+                    <div class="form-text">El pasillo o zona donde se encuentra el rack.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Rack</label>
+                    <input class="form-control text-uppercase" maxlength="4" @bind="nuevoRack" @bind:event="oninput" placeholder="A" />
+                    <div class="form-text">Ponle una letra al rack: A, B, C…</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">¿Cuántas tarimas caben aquí?</label>
+                    <input type="number" min="1" class="form-control" @bind="nuevaCapacidad" />
+                    <div class="form-text">Normalmente 1 tarima por hueco.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Nivel (altura)</label>
+                    <input type="number" min="1" class="form-control" @bind="nuevoNivel" @bind:event="oninput" />
+                    <div class="form-text">1 = piso. 2, 3… más arriba.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Posición (hueco)</label>
+                    <input type="number" min="1" class="form-control" @bind="nuevaPosicion" @bind:event="oninput" />
+                    <div class="form-text">El número de hueco a lo largo del rack.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Notas</label>
+                    <input class="form-control" @bind="nuevasNotas" placeholder="Opcional (ej. refrigerado)" />
+                    <div class="form-text">Opcional.</div>
+                </div>
+                <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top pt-3">
+                    <span class="text-muted">Este hueco se llamará: <code class="fs-6">@VistaPreviaCodigo()</code></span>
+                    <button class="btn btn-primary" @onclick="AgregarAsync" disabled="@guardando">
+                        <span class="bi bi-plus-lg"></span> Agregar hueco
+                    </button>
+                </div>
             </div>
-        </div>
+        }
+        else
+        {
+            <p class="text-muted small mb-3">
+                Crea <strong>todos los huecos de un rack de una sola vez</strong>. Dile qué rack es, cuántos niveles
+                tiene y cuántas posiciones, y el sistema genera todos los códigos solo.
+            </p>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">¿En qué pasillo está?</label>
+                    <input class="form-control" @bind="genZona" placeholder="Ej. Pasillo 1" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Rack</label>
+                    <input class="form-control text-uppercase" maxlength="4" @bind="genRack" @bind:event="oninput" placeholder="A" />
+                    <div class="form-text">Ponle una letra: A, B, C…</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">¿Cuántas tarimas caben por hueco?</label>
+                    <input type="number" min="1" class="form-control" @bind="genCapacidad" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">¿Cuántos niveles (alturas) tiene el rack?</label>
+                    <div class="input-group">
+                        <span class="input-group-text">Del nivel</span>
+                        <input type="number" min="1" class="form-control" @bind="genNivelDesde" @bind:event="oninput" />
+                        <span class="input-group-text">al</span>
+                        <input type="number" min="1" class="form-control" @bind="genNivelHasta" @bind:event="oninput" />
+                    </div>
+                    <div class="form-text">Ej. del 1 al 3 = 3 niveles.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">¿Cuántas posiciones (huecos) por nivel?</label>
+                    <div class="input-group">
+                        <span class="input-group-text">De la</span>
+                        <input type="number" min="1" class="form-control" @bind="genPosDesde" @bind:event="oninput" />
+                        <span class="input-group-text">a la</span>
+                        <input type="number" min="1" class="form-control" @bind="genPosHasta" @bind:event="oninput" />
+                    </div>
+                    <div class="form-text">Ej. de la 1 a la 50 = 50 posiciones.</div>
+                </div>
+                <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top pt-3">
+                    <span class="text-muted">@ResumenGenerador()</span>
+                    <button class="btn btn-primary" @onclick="GenerarAsync" disabled="@guardando">
+                        <span class="bi bi-grid-3x3-gap"></span> Generar todo el rack
+                    </button>
+                </div>
+            </div>
+        }
     </div>
 </div>
 }
@@ -171,10 +251,15 @@ else
 
     private bool puedeEditar;
     private bool mostrarFormulario;
+    private bool modoGenerador;
     private List<Ubicacion>? ubicaciones;
     private Dictionary<int, int> ocupacionPorUbicacion = new();
-    private string? nuevaZona, nuevoCodigo, nuevasNotas;
+    private string? nuevaZona, nuevoRack, nuevasNotas;
+    private int nuevoNivel = 1, nuevaPosicion = 1;
     private int nuevaCapacidad = 1;
+    // Generador masivo
+    private string? genZona, genRack;
+    private int genNivelDesde = 1, genNivelHasta = 1, genPosDesde = 1, genPosHasta = 1, genCapacidad = 1;
     private int? editandoId;
     private string? mensaje;
     private bool error;
@@ -198,20 +283,37 @@ else
             .ToDictionaryAsync(x => x.Key, x => x.Total);
     }
 
+    private string VistaPreviaCodigo() =>
+        string.IsNullOrWhiteSpace(nuevoRack) ? "—" : Ubicacion.ArmarCodigo(nuevoRack, nuevoNivel, nuevaPosicion);
+
+    private string ResumenGenerador()
+    {
+        if (string.IsNullOrWhiteSpace(genRack))
+            return "Escribe la letra del rack para ver cuántos huecos se crearán.";
+        if (genNivelHasta < genNivelDesde || genPosHasta < genPosDesde)
+            return "Revisa los rangos: el segundo número no puede ser menor que el primero.";
+        var niveles = genNivelHasta - genNivelDesde + 1;
+        var posiciones = genPosHasta - genPosDesde + 1;
+        var total = niveles * posiciones;
+        var primero = Ubicacion.ArmarCodigo(genRack, genNivelDesde, genPosDesde);
+        var ultimo = Ubicacion.ArmarCodigo(genRack, genNivelHasta, genPosHasta);
+        return $"Se crearán {total} huecos (del {primero} al {ultimo}).";
+    }
+
     private void AbrirFormulario()
     {
         mensaje = null;
         error = false;
-        nuevaZona = nuevoCodigo = nuevasNotas = null;
-        nuevaCapacidad = 1;
+        nuevaZona = nuevoRack = nuevasNotas = null;
+        nuevoNivel = nuevaPosicion = nuevaCapacidad = 1;
         mostrarFormulario = true;
     }
 
     private void CerrarFormulario()
     {
         mostrarFormulario = false;
-        nuevaZona = nuevoCodigo = nuevasNotas = null;
-        nuevaCapacidad = 1;
+        nuevaZona = nuevoRack = nuevasNotas = null;
+        nuevoNivel = nuevaPosicion = nuevaCapacidad = 1;
         mensaje = null;
         error = false;
     }
@@ -226,11 +328,17 @@ else
     {
         mensaje = null;
         error = false;
-        var codigo = nuevoCodigo?.Trim();
-        if (string.IsNullOrWhiteSpace(codigo))
+        var rack = nuevoRack?.Trim();
+        if (string.IsNullOrWhiteSpace(rack))
         {
             error = true;
-            mensaje = "Escribe el código de la posición.";
+            mensaje = "Escribe la letra del rack (ej. A).";
+            return;
+        }
+        if (nuevoNivel < 1 || nuevaPosicion < 1)
+        {
+            error = true;
+            mensaje = "El nivel y la posición deben ser al menos 1.";
             return;
         }
         if (nuevaCapacidad < 1)
@@ -239,6 +347,8 @@ else
             mensaje = "El cupo debe ser al menos 1.";
             return;
         }
+
+        var codigo = Ubicacion.ArmarCodigo(rack, nuevoNivel, nuevaPosicion);
 
         guardando = true;
         try
@@ -253,6 +363,9 @@ else
             db.Ubicaciones.Add(new Ubicacion
             {
                 Zona = string.IsNullOrWhiteSpace(nuevaZona) ? null : nuevaZona.Trim(),
+                Rack = rack.ToUpperInvariant(),
+                Nivel = nuevoNivel,
+                Posicion = nuevaPosicion,
                 Codigo = codigo,
                 Capacidad = nuevaCapacidad,
                 Notas = string.IsNullOrWhiteSpace(nuevasNotas) ? null : nuevasNotas.Trim(),
@@ -260,8 +373,70 @@ else
             });
             await db.SaveChangesAsync();
             mensaje = $"Ubicación '{codigo}' agregada.";
-            nuevaZona = nuevoCodigo = nuevasNotas = null;
-            nuevaCapacidad = 1;
+            nuevaZona = nuevoRack = nuevasNotas = null;
+            nuevoNivel = nuevaPosicion = nuevaCapacidad = 1;
+            mostrarFormulario = false;
+            await CargarAsync();
+        }
+        finally { guardando = false; }
+    }
+
+    private async Task GenerarAsync()
+    {
+        mensaje = null;
+        error = false;
+        var rack = genRack?.Trim();
+        if (string.IsNullOrWhiteSpace(rack))
+        {
+            error = true;
+            mensaje = "Escribe la letra del rack (ej. A).";
+            return;
+        }
+        if (genNivelDesde < 1 || genPosDesde < 1 || genNivelHasta < genNivelDesde || genPosHasta < genPosDesde)
+        {
+            error = true;
+            mensaje = "Revisa los rangos: el 'hasta' no puede ser menor que el 'desde'.";
+            return;
+        }
+        if (genCapacidad < 1)
+        {
+            error = true;
+            mensaje = "El cupo debe ser al menos 1.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var existentes = await db.Ubicaciones.Select(u => u.Codigo).ToListAsync();
+            var yaExisten = new HashSet<string>(existentes);
+            var zona = string.IsNullOrWhiteSpace(genZona) ? null : genZona.Trim();
+            var rackUp = rack.ToUpperInvariant();
+            int creadas = 0, omitidas = 0;
+
+            for (var nivel = genNivelDesde; nivel <= genNivelHasta; nivel++)
+            {
+                for (var pos = genPosDesde; pos <= genPosHasta; pos++)
+                {
+                    var codigo = Ubicacion.ArmarCodigo(rackUp, nivel, pos);
+                    if (!yaExisten.Add(codigo)) { omitidas++; continue; }
+                    db.Ubicaciones.Add(new Ubicacion
+                    {
+                        Zona = zona,
+                        Rack = rackUp,
+                        Nivel = nivel,
+                        Posicion = pos,
+                        Codigo = codigo,
+                        Capacidad = genCapacidad,
+                        Activo = true
+                    });
+                    creadas++;
+                }
+            }
+            await db.SaveChangesAsync();
+            mensaje = $"Se crearon {creadas} ubicación(es) del rack {rackUp}." +
+                      (omitidas > 0 ? $" {omitidas} ya existían y se omitieron." : "");
             mostrarFormulario = false;
             await CargarAsync();
         }

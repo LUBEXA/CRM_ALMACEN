@@ -78,6 +78,11 @@ builder.Services.AddAuthorizationCore(options =>
     options.AddPolicy("Ver:OcupacionAlmacen", p => p.RequireAuthenticatedUser()
         .RequireAssertion(ctx => ctx.User.EsPersonal() && ctx.User.PuedeVer(ModuloApp.Inventario)));
 
+    // Finanzas: panel global de cobros del negocio. Solo personal con acceso a Pagos
+    // (Admin/Cobranza); nunca el cliente, aunque pueda ver sus propios pagos.
+    options.AddPolicy("Ver:Finanzas", p => p.RequireAuthenticatedUser()
+        .RequireAssertion(ctx => ctx.User.EsPersonal() && ctx.User.PuedeVer(ModuloApp.Pagos)));
+
     // Pantallas exclusivas del cliente (no del personal del almacén).
     options.AddPolicy("EsCliente", p => p.RequireAuthenticatedUser()
         .RequireAssertion(ctx => ctx.User.ClienteId() is not null));

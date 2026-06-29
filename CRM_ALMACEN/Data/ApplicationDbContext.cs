@@ -22,6 +22,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<CostoServicio> CostosServicio => Set<CostoServicio>();
     public DbSet<Servicio> Servicios => Set<Servicio>();
     public DbSet<Ubicacion> Ubicaciones => Set<Ubicacion>();
+    public DbSet<Gasto> Gastos => Set<Gasto>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -92,6 +93,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(c => c.ClienteId).OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<Servicio>().Property(s => s.ImporteNeto).HasPrecision(12, 2);
+
+        builder.Entity<Gasto>().Property(g => g.Monto).HasPrecision(12, 2);
 
         // Vincular usuario -> cliente
         builder.Entity<ApplicationUser>()

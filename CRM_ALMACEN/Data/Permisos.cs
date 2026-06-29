@@ -12,7 +12,8 @@ public enum ModuloApp
     Pagos,
     Clientes,
     Productos,
-    ListaPrecios
+    ListaPrecios,
+    Gastos
 }
 
 /// <summary>Nivel de acceso a un módulo. El orden importa: mayor número = más permiso.</summary>
@@ -44,7 +45,8 @@ public static class Permisos
         (ModuloApp.Pagos, "Pagos y Facturación"),
         (ModuloApp.Clientes, "Clientes"),
         (ModuloApp.Productos, "Productos"),
-        (ModuloApp.ListaPrecios, "Lista de precios")
+        (ModuloApp.ListaPrecios, "Lista de precios"),
+        (ModuloApp.Gastos, "Gastos")
     ];
 
     public static string NombreNivel(NivelAcceso n) => n switch
@@ -77,6 +79,7 @@ public static class Permisos
             case DbSeeder.RolCobranza:
                 d[ModuloApp.Pagos] = NivelAcceso.Editar;
                 d[ModuloApp.ListaPrecios] = NivelAcceso.Editar;
+                d[ModuloApp.Gastos] = NivelAcceso.Editar;
                 d[ModuloApp.Clientes] = NivelAcceso.SoloVer;
                 break;
 

@@ -16,7 +16,17 @@ public class Ubicacion
     [MaxLength(60)]
     public string? Zona { get; set; }
 
-    /// <summary>Identificador corto de la posición. Ej. "P3-RB-N2".</summary>
+    /// <summary>Letra del rack (o cara del rack). Ej. "A".</summary>
+    [MaxLength(4)]
+    public string? Rack { get; set; }
+
+    /// <summary>Nivel o altura dentro del rack. 1 = piso.</summary>
+    public int? Nivel { get; set; }
+
+    /// <summary>Posición (hueco) a lo largo del nivel.</summary>
+    public int? Posicion { get; set; }
+
+    /// <summary>Identificador corto de la posición. Ej. "A-2-05". Se arma desde Rack/Nivel/Posición.</summary>
     [Required, MaxLength(40)]
     public string Codigo { get; set; } = string.Empty;
 
@@ -35,4 +45,11 @@ public class Ubicacion
     [NotMapped]
     public string Etiqueta =>
         string.IsNullOrWhiteSpace(Zona) ? Codigo : $"{Zona} · {Codigo}";
+
+    /// <summary>
+    /// Arma el código estándar a partir de rack, nivel y posición. Ej. "A-2-05".
+    /// La posición se rellena a 2 dígitos para que ordene parejo (01, 02, … 10).
+    /// </summary>
+    public static string ArmarCodigo(string? rack, int nivel, int posicion) =>
+        $"{(rack ?? "").Trim().ToUpperInvariant()}-{nivel}-{posicion:00}";
 }
