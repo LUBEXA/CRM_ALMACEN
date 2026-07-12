@@ -66,7 +66,14 @@
       "Bash(psql --version)",
       "Read(//c/Program Files/PostgreSQL/**)",
       "Read(//c/Program Files \\(x86\\)/**)",
-      "PowerShell(dotnet build \"C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN\\\\CRM_ALMACEN\\\\CRM_ALMACEN.csproj\" -nologo -v q 2>&1)"
+      "PowerShell(dotnet build \"C:\\\\Users\\\\memo_\\\\source\\\\repos\\\\CRM_ALMACEN\\\\CRM_ALMACEN\\\\CRM_ALMACEN.csproj\" -nologo -v q 2>&1)",
+      "Bash(git fetch *)",
+      "Bash(grep -vE '^\\\\s*#|^\\\\s*$')",
+      "Bash(grep -iA2 -i \"connection\")",
+      "PowerShell($ports = @\\(5194,7296\\); foreach\\($p in $ports\\){ $c = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue; if\\($c\\){ \"Puerto $p OCUPADO por PID\\(s\\): \" + \\($c.OwningProcess -join ', '\\) } else { \"Puerto $p libre\" } })",
+      "PowerShell(dotnet build \"C:/Users/memo_/source/repos/CRM_ALMACEN/CRM_ALMACEN/CRM_ALMACEN.csproj\" -nologo -v q 2>&1)",
+      "PowerShell(dotnet ef migrations add CorteFacturacion --project \"C:/Users/memo_/source/repos/CRM_ALMACEN/CRM_ALMACEN/CRM_ALMACEN.csproj\" 2>&1)",
+      "PowerShell(dotnet --version)"
     ]
   }
 }
